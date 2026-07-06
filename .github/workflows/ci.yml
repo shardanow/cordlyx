@@ -50,15 +50,13 @@ jobs:
 
       - run: npm run build -w packages/shared
 
-      - run: npm run build -w backend
-
       - name: Lint
         run: npm run lint
 
-      - name: Backend test DB push
+      - name: Push schema
+        run: psql "$DATABASE_URL" < backend/schema.sql
         env:
           DATABASE_URL: postgres://cordlyx:cordlyx@localhost:5432/cordlyx_test
-        run: npm run test:db:push -w backend
 
       - name: Test
         run: npm test
