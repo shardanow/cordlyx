@@ -1,0 +1,166 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 224 71% 4%;
+    --card: 0 0% 100%;
+    --card-foreground: 224 71% 4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 71% 4%;
+    --primary: 243 75% 59%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 243 30% 96%;
+    --secondary-foreground: 243 60% 35%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 243 30% 94%;
+    --accent-foreground: 243 60% 35%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 243 75% 59%;
+    --sidebar: 220 14% 97%;
+    --radius: 0.625rem;
+  }
+
+  .dark {
+    --background: 224 71% 4%;
+    --foreground: 213 31% 91%;
+    --card: 224 47% 6%;
+    --card-foreground: 213 31% 91%;
+    --popover: 224 47% 6%;
+    --popover-foreground: 213 31% 91%;
+    --primary: 234 89% 74%;
+    --primary-foreground: 224 71% 4%;
+    --secondary: 224 24% 12%;
+    --secondary-foreground: 213 31% 91%;
+    --muted: 224 24% 12%;
+    --muted-foreground: 218 11% 65%;
+    --accent: 224 24% 16%;
+    --accent-foreground: 213 31% 91%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 224 24% 14%;
+    --input: 224 24% 14%;
+    --ring: 234 89% 74%;
+    --sidebar: 224 47% 5%;
+  }
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+}
+
+/* Native selects respect color-scheme for option list background */
+select {
+  color-scheme: light dark;
+}
+
+.dark select option {
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+}
+
+/* RichEditor prose colors follow theme */
+.prose {
+  --tw-prose-body: hsl(var(--foreground));
+  --tw-prose-headings: hsl(var(--foreground));
+  --tw-prose-bold: hsl(var(--foreground));
+  --tw-prose-quotes: hsl(var(--foreground));
+  --tw-prose-code: hsl(var(--foreground));
+  --tw-prose-links: hsl(var(--primary));
+  --tw-prose-bullets: hsl(var(--muted-foreground));
+}
+
+.prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.prose [data-align="left"] {
+  float: left;
+  margin-right: 1rem;
+  max-width: 50%;
+}
+
+.prose [data-align="right"] {
+  float: right;
+  margin-left: 1rem;
+  max-width: 50%;
+}
+
+.prose [data-align="center"] {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.prose img:hover {
+  opacity: 0.85;
+}
+
+.prose ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.prose ul[data-type="taskList"] li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.prose ul[data-type="taskList"] li > div > p {
+  margin: 0;
+}
+
+.prose ul[data-type="taskList"] li > label {
+  flex: 0 0 auto;
+  margin-top: 0.2em;
+  user-select: none;
+}
+
+.prose ul[data-type="taskList"] li > label input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+.prose ul[data-type="taskList"] li > div {
+  flex: 1 1 auto;
+}
+
+.prose table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.prose table th,
+.prose table td {
+  border: 1px solid hsl(var(--border));
+  padding: 0.5rem 0.75rem;
+  vertical-align: top;
+  min-width: 60px;
+}
+
+.prose table th {
+  background: hsl(var(--muted));
+  font-weight: 600;
+}
+
+.prose table p {
+  margin: 0;
+}
+
+.prose .mention {
+  background: hsl(var(--primary) / 0.1);
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.25rem;
+}

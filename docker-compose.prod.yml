@@ -1,0 +1,95 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: cordlyx-postgres
+    environment:
+      POSTGRES_USER: cordlyx
+      POSTGRES_PASSWORD: cordlyx
+      POSTGRES_DB: cordlyx
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U cordlyx']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: cordlyx-redis
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: cordlyx-api
+    volumes:
+      - uploads:/app/data/uploads
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://cordlyx:cordlyx@postgres:5432/cordlyx
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      STORAGE_PROVIDER: local
+      STORAGE_LOCAL_PATH: ./data/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: backend/worker/Dockerfile
+    container_name: cordlyx-worker
+    volumes:
+      - uploads:/app/data/uploads
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://cordlyx:cordlyx@postgres:5432/cordlyx
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: cordlyx-frontend
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: /api/v1
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: cordlyx-nginx
+    ports:
+      - '80:80'
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api
+      - frontend
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  uploads:

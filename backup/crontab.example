@@ -1,0 +1,14 @@
+# ── CordLyx Automated Backups (crontab example) ──
+#
+# Install: ./backup/setup-cron.sh
+# Remove:  ./backup/setup-cron.sh --uninstall
+#
+# Manual backup: ./backup/backup.sh
+#   --db        Database only
+#   --uploads   Uploads only
+#   --cleanup   Remove backups older than RETENTION_DAYS (default: 14)
+#
+# Logs: backups/cron.log
+#
+# The setup-cron.sh script handles path detection and idempotent
+# install/uninstall. Use THAT instead of editing this file directly.

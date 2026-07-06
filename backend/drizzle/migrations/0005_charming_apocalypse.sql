@@ -1,0 +1,1 @@
+ALTER TABLE "roadmap_lanes" ADD COLUMN "icon" varchar(10);

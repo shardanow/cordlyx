@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CordLyx MVP Roadmap</title>
+  <style>
+    :root {
+      --bg: #f7f8fc;
+      --surface: #ffffff;
+      --border: #e5e8f1;
+      --border-strong: #d8deec;
+      --text: #0f172a;
+      --muted: #667085;
+      --muted-2: #98a2b3;
+      --purple: #5b42f3;
+      --purple-dark: #4933da;
+      --navy: #071b31;
+      --green: #22c55e;
+      --orange: #f59e0b;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --shadow: 0 18px 48px rgba(16, 24, 40, .08);
+      --soft-shadow: 0 6px 18px rgba(16, 24, 40, .06);
+      --radius: 16px;
+      --week-count: 11;
+      --lane-h: 142px;
+      --header-h: 86px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at top left, #fff 0, #f5f7fd 34%, #eef2fb 100%);
+      overflow: hidden;
+    }
+
+    .app {
+      display: flex;
+      height: 100vh;
+      min-width: 1280px;
+    }
+
+    .side-nav {
+      width: 68px;
+      background: linear-gradient(180deg, #081b31 0%, #06172a 100%);
+      color: white;
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      box-shadow: inset -1px 0 0 rgba(255,255,255,.08);
+    }
+
+    .logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #714cff 0%, #35c4ff 100%);
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      font-size: 19px;
+      letter-spacing: -.05em;
+      margin-bottom: 14px;
+    }
+
+    .nav-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      color: rgba(255,255,255,.84);
+      font-size: 20px;
+      position: relative;
+    }
+
+    .nav-btn.active {
+      background: linear-gradient(135deg, #7857ff, #4a36d8);
+      box-shadow: 0 12px 28px rgba(91, 66, 243, .36);
+      color: #fff;
+    }
+
+    .nav-spacer { flex: 1; }
+
+    .main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .topbar {
+      height: 56px;
+      background: rgba(255,255,255,.88);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 26px 0 34px;
+    }
+
+    .crumbs {
+      color: #697386;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .crumbs strong { color: #1d2939; font-weight: 700; }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      color: #334155;
+      font-size: 20px;
+    }
+
+    .avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: #ede9fe;
+      color: #3b2d91;
+      display: grid;
+      place-items: center;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .notify { position: relative; }
+    .notify::after {
+      content: "3";
+      position: absolute;
+      top: -7px;
+      right: -8px;
+      width: 17px;
+      height: 17px;
+      border-radius: 999px;
+      background: var(--purple);
+      color: white;
+      font-size: 10px;
+      display: grid;
+      place-items: center;
+      border: 2px solid white;
+    }
+
+    .content {
+      flex: 1;
+      padding: 24px 26px 24px 28px;
+      overflow: hidden;
+    }
+
+    .page-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 22px;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.1;
+      letter-spacing: -.04em;
+      font-weight: 820;
+    }
+
+    .ghost-icon {
+      color: #697386;
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .meta-row {
+      display: flex;
+      gap: 18px;
+      margin-top: 18px;
+      color: #4b5565;
+      font-size: 14px;
+      align-items: center;
+    }
+
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .meta-item.project { color: var(--purple); font-weight: 700; }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .btn {
+      height: 42px;
+      padding: 0 18px;
+      border-radius: 10px;
+      border: 1px solid var(--border-strong);
+      background: #fff;
+      color: #1d2939;
+      font-weight: 700;
+      font-size: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      box-shadow: 0 1px 2px rgba(16,24,40,.04);
+    }
+
+    .btn.primary {
+      color: white;
+      border-color: transparent;
+      background: linear-gradient(135deg, #684cf6, #5237df);
+      box-shadow: 0 14px 30px rgba(91,66,243,.24);
+      padding: 0 24px;
+    }
+
+    .btn.split {
+      padding-right: 12px;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 330px 1fr;
+      gap: 16px;
+      height: calc(100vh - 170px);
+      min-height: 620px;
+    }
+
+    .panel, .timeline-card {
+      background: rgba(255,255,255,.94);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--soft-shadow);
+      overflow: hidden;
+    }
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .panel-head {
+      padding: 18px 14px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .panel-title {
+      font-size: 16px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .count {
+      color: #5b42f3;
+      background: #ede9fe;
+      border-radius: 999px;
+      padding: 3px 9px;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .square-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      border: 1px solid var(--border-strong);
+      display: grid;
+      place-items: center;
+      background: #fff;
+      color: #344054;
+      font-weight: 900;
+    }
+
+    .search-row {
+      padding: 0 14px 12px;
+      display: grid;
+      grid-template-columns: 1fr 38px;
+      gap: 10px;
+    }
+
+    .search {
+      height: 40px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 0 12px;
+      color: var(--muted-2);
+      font-size: 14px;
+      background: #fff;
+    }
+
+    .item-list {
+      padding: 0 12px 12px;
+      overflow: auto;
+      scrollbar-width: thin;
+    }
+
+    .source-item {
+      min-height: 64px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 8px;
+      background: #fff;
+      display: grid;
+      grid-template-columns: 44px 1fr auto;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      transition: .18s ease;
+    }
+
+    .source-item:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--soft-shadow);
+      border-color: #d6dbeb;
+    }
+
+    .item-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+      font-weight: 800;
+    }
+
+    .icon-green { background: #ecfdf3; color: #16a34a; }
+    .icon-blue { background: #eff6ff; color: #2563eb; }
+    .icon-purple { background: #f5f3ff; color: #7c3aed; }
+    .icon-pink { background: #fdf2f8; color: #db2777; }
+    .icon-orange { background: #fff7ed; color: #f97316; }
+
+    .source-title { font-weight: 760; font-size: 14px; margin-bottom: 5px; }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 7px;
+      border-radius: 7px;
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .pill.feature { background: #dcfce7; color: #15803d; }
+    .pill.improvement { background: #dbeafe; color: #1d4ed8; }
+    .pill.bug { background: #ffedd5; color: #c2410c; }
+    .pill.plan { background: #f3e8ff; color: #6d28d9; }
+    .pill.milestone { background: #f5f3ff; color: #5b21b6; }
+
+    .priority {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #667085;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--orange); display: inline-block; }
+    .up { color: var(--red); font-size: 14px; font-weight: 900; }
+
+    .drag-help {
+      margin: auto 16px 16px;
+      min-height: 76px;
+      border-radius: 12px;
+      background: #fff;
+      color: #98a2b3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 13px;
+      border: 1px dashed #d7dceb;
+    }
+
+    .timeline-card {
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .timeline-toolbar {
+      height: 50px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .back-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      border: 1px solid var(--border-strong);
+      background: #fff;
+      display: grid;
+      place-items: center;
+      color: #344054;
+      font-size: 18px;
+    }
+
+    .zoom-control {
+      height: 34px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #fff;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 10px;
+      color: #475467;
+      font-size: 15px;
+    }
+
+    .slider {
+      width: 82px;
+      height: 5px;
+      background: #e4e7ec;
+      border-radius: 99px;
+      position: relative;
+    }
+    .slider::after {
+      content: "";
+      position: absolute;
+      left: 43%; top: 50%;
+      transform: translate(-50%, -50%);
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--purple);
+      box-shadow: 0 2px 8px rgba(91, 66, 243, .4);
+    }
+
+    .timeline-area {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 138px 1fr;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .corner {
+      height: var(--header-h);
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      background: #fff;
+    }
+
+    .time-head {
+      height: var(--header-h);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      background: #fff;
+    }
+
+    .months {
+      height: 38px;
+      display: grid;
+      grid-template-columns: 2.7fr 4.4fr 3.9fr;
+      align-items: end;
+      padding: 0 0 8px;
+      font-size: 13px;
+      font-weight: 800;
+      color: #1f2937;
+    }
+
+    .months > div { padding-left: 12px; border-left: 1px solid var(--border); }
+
+    .weeks {
+      height: 48px;
+      display: grid;
+      grid-template-columns: repeat(var(--week-count), 1fr);
+      border-top: 1px solid var(--border);
+    }
+
+    .week {
+      border-left: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: #344054;
+      white-space: nowrap;
+    }
+
+    .lanes {
+      border-right: 1px solid var(--border);
+      background: #fff;
+    }
+
+    .lane-label {
+      height: var(--lane-h);
+      border-bottom: 1px solid var(--border);
+      padding: 26px 14px 0 16px;
+      display: grid;
+      grid-template-columns: 18px 24px 1fr 12px;
+      gap: 8px;
+      align-items: start;
+    }
+
+    .handle { color: #667085; font-weight: 900; letter-spacing: -2px; }
+    .lane-ico { font-size: 18px; }
+    .lane-name { font-weight: 820; font-size: 13px; color: #1d2939; }
+    .lane-count { font-size: 12px; color: #667085; margin-top: 4px; }
+    .chev { color: #98a2b3; font-size: 18px; padding-top: 4px; }
+
+    .add-lane {
+      margin: -58px 0 0 16px;
+      position: relative;
+      z-index: 4;
+      height: 38px;
+      padding: 0 14px;
+      border-radius: 10px;
+      border: 1px solid #e3e7f0;
+      background: #fff;
+      color: var(--purple);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 800;
+    }
+
+    .time-grid {
+      position: relative;
+      min-width: 760px;
+      background-image:
+        repeating-linear-gradient(to right, transparent 0, transparent calc(100% / var(--week-count) - 1px), var(--border) calc(100% / var(--week-count) - 1px), var(--border) calc(100% / var(--week-count))),
+        repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--lane-h) - 1px), var(--border) calc(var(--lane-h) - 1px), var(--border) var(--lane-h));
+      background-color: #fff;
+    }
+
+    .today-line {
+      position: absolute;
+      top: -86px;
+      bottom: 0;
+      left: 12.6%;
+      width: 1px;
+      background: rgba(239, 68, 68, .62);
+      z-index: 8;
+    }
+
+    .today-label {
+      position: absolute;
+      top: -75px;
+      left: 12.6%;
+      transform: translateX(-50%);
+      background: linear-gradient(180deg, #ef4444, #d92d20);
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 900;
+      z-index: 9;
+      box-shadow: 0 8px 18px rgba(239, 68, 68, .22);
+    }
+
+    .bar {
+      position: absolute;
+      height: 58px;
+      border-radius: 9px;
+      padding: 11px 14px;
+      z-index: 6;
+      border: 1.5px solid;
+      box-shadow: 0 7px 16px rgba(16,24,40,.05);
+      cursor: default;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .bar-title {
+      font-size: 13px;
+      font-weight: 850;
+      margin-bottom: 5px;
+      color: #101828;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .bar-date { font-size: 12px; color: #475467; font-weight: 600; }
+
+    .bar.purple { background: linear-gradient(180deg, #f0eaff, #eee8ff); border-color: #b39afc; }
+    .bar.green { background: linear-gradient(180deg, #ecfdf3, #e6f8e9); border-color: #9bd7a7; }
+    .bar.blue { background: linear-gradient(180deg, #eff6ff, #e9f3ff); border-color: #93c5fd; }
+    .bar.yellow { background: linear-gradient(180deg, #fff7e6, #fff1d1); border-color: #f7bf52; }
+
+    .bar .flag { color: #6d28d9; margin-right: 5px; }
+
+    .bar:hover {
+      outline: 3px solid rgba(91, 66, 243, .12);
+    }
+
+    .milestone {
+      height: 58px;
+      min-width: 122px;
+      text-align: center;
+    }
+
+    .dep-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 5;
+      overflow: visible;
+    }
+
+    .timeline-bottom {
+      height: 58px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      background: #fff;
+    }
+
+    .legend {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .legend-chip {
+      height: 30px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #fff;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 10px;
+      color: #344054;
+      font-size: 12px;
+      font-weight: 750;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      display: inline-block;
+    }
+
+    .view-settings {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #344054;
+      font-size: 13px;
+      font-weight: 780;
+    }
+
+    .muted { color: var(--muted); }
+
+    @media (max-height: 820px) {
+      :root { --lane-h: 122px; --header-h: 76px; }
+      .bar { height: 50px; padding: 8px 12px; }
+      h1 { font-size: 28px; }
+      .workspace { height: calc(100vh - 160px); }
+      .source-item { min-height: 56px; }
+      .item-icon { width: 32px; height: 32px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="side-nav">
+      <div class="logo">C</div>
+      <div class="nav-btn">⌂</div>
+      <div class="nav-btn active">▦</div>
+      <div class="nav-btn">▣</div>
+      <div class="nav-btn">☼</div>
+      <div class="nav-btn">♧</div>
+      <div class="nav-btn">▱</div>
+      <div class="nav-btn">⚙</div>
+      <div class="nav-spacer"></div>
+      <div class="nav-btn">»</div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="crumbs"><span>Roadmaps</span><span>›</span><strong>CordLyx MVP Roadmap</strong></div>
+        <div class="top-actions">
+          <span>⌕</span>
+          <span class="notify">♢</span>
+          <span>?</span>
+          <div class="avatar">AK</div>
+          <span style="font-size:14px">⌄</span>
+        </div>
+      </header>
+
+      <section class="content">
+        <div class="page-head">
+          <div>
+            <div class="title-row">
+              <h1>CordLyx MVP Roadmap</h1>
+              <span class="ghost-icon">✎</span>
+              <span class="ghost-icon">☆</span>
+            </div>
+            <div class="meta-row">
+              <div class="meta-item project">▱ <span>CordLyx</span></div>
+              <div class="meta-item">▣ <span>Jul 6 – Sep 27, 2026</span></div>
+              <div class="meta-item">♙ <span>Weekly</span>⌄</div>
+            </div>
+          </div>
+          <div class="header-actions">
+            <button class="btn">▽ Filters</button>
+            <button class="btn">⚙ Settings</button>
+            <button class="btn">♧ Share</button>
+            <button class="btn primary split">▣ Save <span style="padding-left:14px;border-left:1px solid rgba(255,255,255,.25)">⌄</span></button>
+          </div>
+        </div>
+
+        <div class="workspace">
+          <aside class="panel">
+            <div class="panel-head">
+              <div class="panel-title">Unscheduled items <span class="count">7</span></div>
+              <button class="square-btn">+</button>
+            </div>
+            <div class="search-row">
+              <div class="search">⌕ <span>Search unscheduled items...</span></div>
+              <button class="square-btn">≡</button>
+            </div>
+
+            <div class="item-list">
+              <div class="source-item">
+                <div class="item-icon icon-green">▧</div>
+                <div><div class="source-title">Public Forms</div><span class="pill feature">Feature</span></div>
+                <div class="priority"><span class="dot"></span>Medium</div>
+              </div>
+              <div class="source-item">
+                <div class="item-icon icon-purple">▣</div>
+                <div><div class="source-title">Permissions System</div><span class="pill feature">Feature</span></div>
+                <div class="priority"><span class="up">⌃</span>High</div>
+              </div>
+              <div class="source-item">
+                <div class="item-icon icon-blue">▤</div>
+                <div><div class="source-title">Custom Fields</div><span class="pill feature">Feature</span></div>
+                <div class="priority"><span class="dot"></span>Medium</div>
+              </div>
+              <div class="source-item">
+                <div class="item-icon icon-pink">▰</div>
+                <div><div class="source-title">Better Board UX</div><span class="pill improvement">Improvement</span></div>
+                <div class="priority"><span class="dot"></span>Medium</div>
+              </div>
+              <div class="source-item">
+                <div class="item-icon icon-purple">✦</div>
+                <div><div class="source-title">AI Summary</div><span class="pill feature">Feature</span></div>
+                <div class="priority"><span class="up">⌃</span>High</div>
+              </div>
+              <div class="source-item">
+                <div class="item-icon icon-orange">▯</div>
+                <div><div class="source-title">Mobile Layout</div><span class="pill improvement">Improvement</span></div>
+                <div class="priority"><span class="dot"></span>Medium</div>
+              </div>
+              <div class="source-item">
+                <div class="item-icon icon-orange">✉</div>
+                <div><div class="source-title">Email Notifications</div><span class="pill feature">Feature</span></div>
+                <div class="priority"><span class="dot"></span>Medium</div>
+              </div>
+            </div>
+            <div class="drag-help">✣ Drag items onto the roadmap to schedule</div>
+          </aside>
+
+          <section class="timeline-card">
+            <div class="timeline-toolbar">
+              <button class="back-btn">‹</button>
+              <div class="zoom-control">⌕ <span>−</span><div class="slider"></div><span>+</span><span>⛶</span></div>
+            </div>
+
+            <div class="timeline-area">
+              <div class="corner"></div>
+              <div class="time-head">
+                <div class="months"><div>Jul 2026</div><div>Aug 2026</div><div>Sep 2026</div></div>
+                <div class="weeks">
+                  <div class="week">Jul 6 – 12</div>
+                  <div class="week">Jul 13 – 19</div>
+                  <div class="week">Jul 20 – 26</div>
+                  <div class="week">Aug 3 – 9</div>
+                  <div class="week">Aug 10 – 16</div>
+                  <div class="week">Aug 17 – 23</div>
+                  <div class="week">Aug 24 – 30</div>
+                  <div class="week">Aug 31 – Sep 6</div>
+                  <div class="week">Sep 7 – 13</div>
+                  <div class="week">Sep 14 – 20</div>
+                  <div class="week">Sep 21 – 27</div>
+                </div>
+              </div>
+
+              <div class="lanes">
+                <div class="lane-label"><span class="handle">⋮⋮</span><span class="lane-ico" style="color:#5b42f3">◈</span><div><div class="lane-name">Core</div><div class="lane-count">4 items</div></div><span class="chev">›</span></div>
+                <div class="lane-label"><span class="handle">⋮⋮</span><span class="lane-ico" style="color:#16a34a">▤</span><div><div class="lane-name">Backend</div><div class="lane-count">3 items</div></div><span class="chev">⌃</span></div>
+                <div class="lane-label"><span class="handle">⋮⋮</span><span class="lane-ico" style="color:#2563eb">▰</span><div><div class="lane-name">UI / UX</div><div class="lane-count">4 items</div></div><span class="chev">›</span></div>
+                <div class="lane-label"><span class="handle">⋮⋮</span><span class="lane-ico" style="color:#667085">◷</span><div><div class="lane-name">Later</div><div class="lane-count">2 items</div></div><span class="chev"></span></div>
+                <button class="add-lane">＋ Add lane</button>
+              </div>
+
+              <div class="time-grid">
+                <div class="today-line"></div>
+                <div class="today-label">Today</div>
+
+                <svg class="dep-svg" viewBox="0 0 1000 568" preserveAspectRatio="none">
+                  <defs>
+                    <marker id="arrow" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+                      <polygon points="0 0, 7 3.5, 0 7" fill="#8d98aa" />
+                    </marker>
+                    <marker id="arrow-dark" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+                      <polygon points="0 0, 7 3.5, 0 7" fill="#687385" />
+                    </marker>
+                  </defs>
+                  <path d="M236 72 C260 72 250 100 273 100" stroke="#8d98aa" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+                  <path d="M538 98 C570 98 560 235 600 235" stroke="#8d98aa" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+                  <path d="M492 235 H568" stroke="#687385" stroke-width="2" fill="none" marker-end="url(#arrow-dark)"/>
+                  <path d="M736 235 C780 235 760 140 784 140 C800 140 790 92 815 92" stroke="#8d98aa" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+                  <path d="M720 95 C740 95 730 343 765 343" stroke="#8d98aa" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+                  <path d="M653 343 H720" stroke="#8d98aa" stroke-width="2" stroke-dasharray="6 5" fill="none" marker-end="url(#arrow)"/>
+                  <path d="M894 345 C980 345 955 90 938 90" stroke="#687385" stroke-width="2" fill="none" marker-end="url(#arrow-dark)"/>
+                </svg>
+
+                <div class="bar purple" style="left: 1%; top: 24px; width: 23%;"><div class="bar-title"><span class="flag">⚑</span>Project &amp; Workspace Setup</div><div class="bar-date">Jul 6 – Jul 19</div></div>
+                <div class="bar purple" style="left: 27%; top: 58px; width: 20%;"><div class="bar-title"><span class="flag">⚑</span>Task Management</div><div class="bar-date">Jul 20 – Aug 9</div></div>
+                <div class="bar purple" style="left: 49%; top: 58px; width: 25%;"><div class="bar-title">Activity Feed</div><div class="bar-date">Aug 10 – Aug 30</div></div>
+                <div class="bar purple milestone" style="left: 92%; top: 58px; width: 8%;"><div class="bar-title">🚀 MVP Release</div><div class="bar-date">Sep 21 – Sep 27</div></div>
+
+                <div class="bar green" style="left: 1%; top: calc(var(--lane-h) + 28px); width: 23%;"><div class="bar-title">▤ API Foundations</div><div class="bar-date">Jul 6 – Jul 26</div></div>
+                <div class="bar green" style="left: 24%; top: calc(var(--lane-h) + 66px); width: 29%;"><div class="bar-title">Permissions &amp; Roles</div><div class="bar-date">Jul 27 – Aug 16</div></div>
+                <div class="bar green" style="left: 56%; top: calc(var(--lane-h) + 66px); width: 23%;"><div class="bar-title">Notifications Service</div><div class="bar-date">Aug 17 – Sep 6</div></div>
+
+                <div class="bar blue" style="left: 1%; top: calc(var(--lane-h) * 2 + 28px); width: 16%;"><div class="bar-title">▰ Design System</div><div class="bar-date">Jul 6 – Jul 19</div></div>
+                <div class="bar blue" style="left: 19%; top: calc(var(--lane-h) * 2 + 46px); width: 20%;"><div class="bar-title">Better Board UX</div><div class="bar-date">Jul 20 – Aug 9</div></div>
+                <div class="bar blue" style="left: 41%; top: calc(var(--lane-h) * 2 + 46px); width: 24%;"><div class="bar-title">Mobile Layout</div><div class="bar-date">Aug 10 – Aug 30</div></div>
+                <div class="bar blue" style="left: 72%; top: calc(var(--lane-h) * 2 + 46px); width: 21%;"><div class="bar-title">AI Summary</div><div class="bar-date">Aug 31 – Sep 20</div></div>
+
+                <div class="bar yellow" style="left: 68%; top: calc(var(--lane-h) * 3 + 40px); width: 18%;"><div class="bar-title">Public Forms</div><div class="bar-date">Sep 7 – Sep 20</div></div>
+                <div class="bar yellow" style="left: 86%; top: calc(var(--lane-h) * 3 + 68px); width: 14%;"><div class="bar-title">Custom Fields</div><div class="bar-date">Sep 14 – Sep 27</div></div>
+              </div>
+            </div>
+
+            <div class="timeline-bottom">
+              <div class="legend">
+                <div class="legend-chip"><span class="legend-dot" style="background:#dcfce7;border:1px solid #86efac"></span>Feature</div>
+                <div class="legend-chip"><span class="legend-dot" style="background:#dbeafe;border:1px solid #93c5fd"></span>Improvement</div>
+                <div class="legend-chip"><span class="legend-dot" style="background:#fed7aa;border:1px solid #fdba74"></span>Bug</div>
+                <div class="legend-chip"><span class="legend-dot" style="background:#ede9fe;border:1px solid #c4b5fd"></span>Plan</div>
+                <div class="legend-chip"><span class="legend-dot" style="background:#fff;border:1px solid #98a2b3; transform: rotate(45deg)"></span>Milestone</div>
+              </div>
+              <div class="view-settings">◉ View settings ˄</div>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
