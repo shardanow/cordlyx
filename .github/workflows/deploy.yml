@@ -1,0 +1,69 @@
+name: Deploy
+
+# Production deploy: runs only after CI succeeds on main/master.
+# Flow: feature/* -> PR -> dev (CI) -> PR -> main (CI green) -> auto-deploy.
+# Rollback: Actions -> Deploy -> Run workflow -> ref = previous SHA.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to deploy (branch or SHA; previous SHA = rollback)"
+        required: false
+        default: "main"
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy to VPS over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          script: |
+            set -euo pipefail
+            PROJECT_DIR="${{ secrets.DEPLOY_PATH }}"
+            [ -z "$PROJECT_DIR" ] && PROJECT_DIR="$HOME/cordlyx"
+            REF="${{ github.event.inputs.ref || github.event.workflow_run.head_sha }}"
+            COMPOSE="docker compose -f docker-compose.prod.yml"
+
+            cd "$PROJECT_DIR"
+            git fetch origin
+            if [ "$REF" = "main" ] || [ "$REF" = "master" ]; then
+              git checkout "$REF"
+              git pull --ff-only
+            else
+              git fetch origin "$REF"
+              git checkout --detach FETCH_HEAD
+            fi
+            echo "Deployed ref: $(git rev-parse --short HEAD)"
+
+            # Backup DB before touching running services (best effort, never blocks deploy)
+            ./backup/backup.sh --db || true
+
+            $COMPOSE up -d --build
+
+            echo "Waiting for PostgreSQL..."
+            for i in $(seq 1 30); do
+              if $COMPOSE exec -T postgres pg_isready -U cordlyx >/dev/null 2>&1; then
+                break
+              fi
+              sleep 2
+            done
+            $COMPOSE exec -T postgres pg_isready -U cordlyx
+
+            echo "Healthcheck..."
+            curl --fail --max-time 10 http://localhost:3005/health
+            $COMPOSE ps
