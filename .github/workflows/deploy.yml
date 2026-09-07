@@ -64,6 +64,19 @@ jobs:
             done
             $COMPOSE exec -T postgres pg_isready -U cordlyx
 
-            echo "Healthcheck..."
-            curl --fail --max-time 10 http://localhost:3005/health
+            echo "Waiting for API health..."
+            for i in $(seq 1 45); do
+              if curl --fail --max-time 5 http://localhost:3005/health >/dev/null 2>&1; then
+                echo "API healthy"
+                break
+              fi
+              if [ "$i" -eq 45 ]; then
+                echo "=== api logs ==="
+                $COMPOSE logs --tail 30 api || true
+                echo "=== nginx logs ==="
+                $COMPOSE logs --tail 15 nginx || true
+                exit 1
+              fi
+              sleep 2
+            done
             $COMPOSE ps
