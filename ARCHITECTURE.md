@@ -498,7 +498,8 @@ Notes:
 
 ### CI/CD (GitHub Actions)
 
-`.github/workflows/ci.yml` — runs on push/PR to main/master/dev:
+`.github/workflows/ci.yml` — runs on push to main/master only (one run per
+release; docs-only changes ignored; superseded runs auto-cancelled):
 1. Spin up PostgreSQL + Redis (GitHub Actions services)
 2. `npm ci`
 3. `npm run build -w packages/shared`
