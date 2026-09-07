@@ -1,0 +1,3 @@
+Placeholder to keep frontend/public in git (required by frontend/Dockerfile
+COPY --from=builder /app/frontend/public ./public in the standalone runner
+stage). Safe to add real static assets next to this file.
