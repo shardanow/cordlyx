@@ -43,9 +43,13 @@ Open-source issue tracking system — a lightweight alternative to Jira / Linear
 | Storage | Local filesystem (abstracted for S3 later) |
 | Monorepo | npm workspaces |
 
-## Quick Start
+## Quick Start (local dev)
 
 **Prerequisites:** Node.js 22, Docker, npm.
+
+> Two modes: **local dev** (`npm` + `dev.sh`, DB in Docker) vs **production**
+> (Docker only, see [Deployment](#deployment)). They don't mix — `dev.sh`
+> is dev-only and is not used on the server.
 
 ```bash
 # 1. Clone and install
@@ -54,12 +58,10 @@ npm install
 
 # 2. Configure environment
 cp .env.example .env
-# Edit .env — at minimum set JWT_SECRET to a random string (32+ chars)
+# Edit .env — at minimum set JWT_SECRET to a random string (32+ chars):
+# openssl rand -base64 48
 
-# 3. Start infrastructure (PostgreSQL + Redis)
-docker compose up -d
-
-# 4. Push schema and seed demo data
+# 3. Full local stack (infra + schema + seed + backend + worker + frontend)
 ./dev.sh full
 
 # Or use the launcher:
@@ -148,29 +150,94 @@ Backend-only:
 | `JWT_ACCESS_EXPIRES_IN` | `15m` | Access token TTL |
 | `JWT_REFRESH_EXPIRES_IN` | `7d` | Refresh token TTL |
 | `PORT` | `4000` | Backend server port |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:4000/api/v1` | Backend URL for frontend |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:4000/api/v1` | Backend URL for frontend (baked at build time — prod uses `/api/v1` via build arg) |
+| `POSTGRES_PASSWORD` | `cordlyx` | Prod DB password (default keeps dev/CI compat) |
+| `CORS_ORIGIN` | — | Prod CORS origin (not needed for same-origin via nginx) |
 | `ADMIN_EMAILS` | — | Comma-separated admin email addresses |
 | `STORAGE_PROVIDER` | `local` | File storage provider |
 | `STORAGE_LOCAL_PATH` | `./data/uploads` | Local upload path |
 
 ## Deployment
 
-### Docker (recommended)
+### Docker (recommended, production)
+
+On the server you need only `git + Docker + .env` — no `node`/`npm`/`dev.sh`
+(`dev.sh` is local-dev only; app is built inside Docker images).
 
 ```bash
+git clone <repo-url> && cd cordlyx
+cp .env.example .env
+# Required in prod: JWT_SECRET (32+ chars), ADMIN_EMAILS
+# openssl rand -base64 48
+# Optional: POSTGRES_PASSWORD (strong password)
+
 # Build and start all services
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-This starts PostgreSQL, Redis, the NestJS API, the BullMQ worker, the Next.js frontend, and nginx (reverse proxy). Nginx serves as a single entry point on port 80:
+This starts PostgreSQL, Redis, the NestJS API, the BullMQ worker, the Next.js frontend, and nginx (reverse proxy). Only nginx is published to the host (port 3005). Nginx serves as a single entry point:
 
 ```
-nginx:80
-  ├── /api/v1/*      → backend:4000
-  ├── /uploads/*     → backend:4000
-  ├── /socket.io/*   → backend:4000 (with WebSocket upgrade)
+nginx:3005
+  ├── /api/v1/*      → api:4000
+  ├── /uploads/*     → api:4000
+  ├── /socket.io/*   → api:4000 (with WebSocket upgrade)
   └── /*             → frontend:3000
 ```
+
+Schema is not auto-applied — push it once on a fresh server, then create
+your admin via registration (no demo seed in prod):
+
+```bash
+# from the repo root, with DATABASE_URL pointing at the server DB:
+npm run build -w packages/shared && npm run build -w backend
+npx --prefix backend drizzle-kit push --force
+docker compose -f docker-compose.prod.yml exec -T postgres psql -U cordlyx cordlyx -c "
+ALTER TABLE items
+  ADD COLUMN IF NOT EXISTS search_vector tsvector
+  GENERATED ALWAYS AS (
+    to_tsvector('english', coalesce(title,'') || ' ' || coalesce(description,''))
+  ) STORED;
+CREATE INDEX IF NOT EXISTS idx_items_search ON items USING gin(search_vector);
+"
+```
+
+Verify:
+
+```bash
+docker compose -f docker-compose.prod.yml ps   # all running/healthy
+docker logs cordlyx-api --tail 20              # no JWT/Zod errors
+curl http://<SERVER_IP>:3005/health            # DB check
+curl http://<SERVER_IP>:3005/                  # frontend HTML
+```
+
+Firewall: prod compose publishes only `3005:80` (DB/Redis/API ports stay
+inside the Docker network). On the host allow only `22` (your SSH) + `3005`,
+e.g. `ufw default deny incoming && ufw allow 22,3005/tcp`.
+Note: Docker publishes ports via iptables, bypassing UFW — so don't add
+`ports:` for DB/Redis to the prod file. For DB admin use
+`ssh -L 5432:localhost:5432 user@server` instead of exposing ports.
+
+Do NOT open `http://<host>:5432` or `:6379` in a browser — those are raw
+TCP (Postgres wire protocol / RESP), not HTTP. The browser probe logs
+`invalid length of startup packet` (Postgres) and `Possible SECURITY ATTACK
+... Host:` (Redis) and is harmless; check health with `pg_isready` /
+`redis-cli ping` instead.
+
+### Auto-deploy (GitHub Actions)
+
+Branches: `feature/*` → PR → `dev` (CI only) → PR → `main` (CI + auto-deploy).
+Direct pushes to `main` are blocked by branch protection.
+
+On every green CI run on `main`, the `Deploy` workflow SSHes into the VPS
+and runs: `git pull` → DB backup → `compose up -d --build` → `pg_isready` →
+`curl --fail http://localhost:3005/health`. Rollback: Actions → Deploy →
+Run workflow → `ref` = previous SHA.
+
+Required GitHub Environment `production` secrets: `SSH_HOST`, `SSH_USER`,
+`SSH_KEY` (+ optional `SSH_PORT` default `22`, `DEPLOY_PATH` default
+`~/cordlyx`). Server-side `.env` (`JWT_SECRET 32+`, `ADMIN_EMAILS`,
+`POSTGRES_PASSWORD`) is never stored in the repo.
 
 ### Manual
 

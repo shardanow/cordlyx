@@ -43,7 +43,7 @@ cordlyx/
 ├── nginx/                    # Reverse proxy config (prod)
 ├── backup/                   # Backup scripts + systemd timer / cron setup
 ├── .github/workflows/        # CI pipeline (lint → test → build)
-├── dev.sh                    # Interactive launcher
+├── dev.sh                    # Interactive launcher (local dev only, not used in prod)
 ├── docker-compose.yml        # PostgreSQL + Redis (dev)
 └── docker-compose.prod.yml   # PostgreSQL + Redis + API + Worker + Frontend + nginx
 ```
@@ -482,16 +482,22 @@ interface StorageProvider {
 
 | Service | Container | Dockerfile | Port (prod) |
 |---------|-----------|------------|-------------|
-| PostgreSQL | `cordlyx-postgres` | `postgis/postgis:16-3.4` | — |
-| Redis | `cordlyx-redis` | `redis:7-alpine` | — |
-| API | `cordlyx-api` | `backend/Dockerfile` (node:22-alpine) | — |
+| PostgreSQL | `cordlyx-postgres` | `postgis/postgis:16-3.4` | — (internal only, no `ports:`) |
+| Redis | `cordlyx-redis` | `redis:7-alpine` | — (internal only) |
+| API | `cordlyx-api` | `backend/Dockerfile` (node:22-alpine) | — (internal `:4000`, via nginx) |
 | Worker | `cordlyx-worker` | `backend/worker/Dockerfile` (node:22-alpine) | — |
-| Frontend | `cordlyx-frontend` | `frontend/Dockerfile` (node:22-alpine, standalone) | — |
-| nginx | `cordlyx-nginx` | `nginx:alpine` | `80:80` |
+| Frontend | `cordlyx-frontend` | `frontend/Dockerfile` (node:22-alpine, standalone) | — (internal `:3000`, via nginx) |
+| nginx | `cordlyx-nginx` | `nginx:alpine` | `3005:80` (only published port) |
+
+Notes:
+- nginx upstreams are `api:4000` / `frontend:3000` (Docker DNS = compose service names).
+- `NEXT_PUBLIC_API_URL` is baked at frontend build time → passed as Docker build `ARG` (`/api/v1` in prod); server-side `/uploads` rewrite falls back to `http://api:4000` when the public URL is relative.
+- Prod `JWT_SECRET` is required (min 32 chars, fail-fast in compose); `POSTGRES_PASSWORD` defaults to `cordlyx` for dev/CI compat, override in prod `.env`.
+- Host firewall: allow `22` (SSH) + `3005` only; Docker bypasses UFW via iptables, so never add DB/Redis `ports:` to the prod file.
 
 ### CI/CD (GitHub Actions)
 
-`.github/workflows/ci.yml` — runs on push/PR to main/master:
+`.github/workflows/ci.yml` — runs on push/PR to main/master/dev:
 1. Spin up PostgreSQL + Redis (GitHub Actions services)
 2. `npm ci`
 3. `npm run build -w packages/shared`
@@ -499,6 +505,13 @@ interface StorageProvider {
 5. Push schema to test DB
 6. `npm test` (341 unit/integration tests)
 7. `npm run build`
+
+`.github/workflows/deploy.yml` — runs after green CI on main/master
+(`workflow_run`) or manually (`workflow_dispatch` with `ref` for rollback):
+SSH to VPS → `git pull` → DB backup → `compose up -d --build` →
+`pg_isready` → `curl --fail :3005/health`. Concurrency group `production`,
+Environment `production` (`SSH_HOST/SSH_USER/SSH_KEY`, optional
+`SSH_PORT`/`DEPLOY_PATH`). Branch flow: `feature/*` → `dev` → `main`.
 
 ### Backups
 
