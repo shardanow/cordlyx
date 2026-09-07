@@ -179,6 +179,7 @@ This starts PostgreSQL, Redis, the NestJS API, the BullMQ worker, the Next.js fr
 
 ```
 nginx:3005
+  ├── /health         → api:4000 (DB check, no auth)
   ├── /api/v1/*      → api:4000
   ├── /uploads/*     → api:4000
   ├── /socket.io/*   → api:4000 (with WebSocket upgrade)
@@ -226,13 +227,18 @@ TCP (Postgres wire protocol / RESP), not HTTP. The browser probe logs
 
 ### Auto-deploy (GitHub Actions)
 
-Branches: `feature/*` → PR → `dev` (CI only) → PR → `main` (CI + auto-deploy).
-Direct pushes to `main` are blocked by branch protection.
+Branches: `feature/*` → PR → `dev` (no CI) → PR → `main` (CI + auto-deploy).
+Direct pushes to `main` are blocked by branch protection (PR required,
+no required status checks — CI runs only post-merge).
 
-On every green CI run on `main`, the `Deploy` workflow SSHes into the VPS
-and runs: `git pull` → DB backup → `compose up -d --build` → `pg_isready` →
-`curl --fail http://localhost:3005/health`. Rollback: Actions → Deploy →
-Run workflow → `ref` = previous SHA.
+CI (`lint-and-test`) runs **once per release**, on push to `main` only
+(docs-only changes are ignored). Green run triggers `Deploy`, which SSHes
+into the VPS and runs: `git pull` → DB backup → `compose up -d --build` →
+`pg_isready` → health retries on `http://localhost:3005/health`. Red run =
+no deploy. Rollback: Actions → Deploy → Run workflow → `ref` = previous SHA.
+
+Run `npm test` locally before opening a PR to `main` — it replaces the
+missing PR checks.
 
 Required GitHub Environment `production` secrets: `SSH_HOST`, `SSH_USER`,
 `SSH_KEY` (+ optional `SSH_PORT` default `22`, `DEPLOY_PATH` default

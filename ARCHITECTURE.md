@@ -491,13 +491,15 @@ interface StorageProvider {
 
 Notes:
 - nginx upstreams are `api:4000` / `frontend:3000` (Docker DNS = compose service names).
+  Routes: `/health` (= exact) + `/api/v1/`, `/uploads/`, `/socket.io/` → api; `/` → frontend.
 - `NEXT_PUBLIC_API_URL` is baked at frontend build time → passed as Docker build `ARG` (`/api/v1` in prod); server-side `/uploads` rewrite falls back to `http://api:4000` when the public URL is relative.
 - Prod `JWT_SECRET` is required (min 32 chars, fail-fast in compose); `POSTGRES_PASSWORD` defaults to `cordlyx` for dev/CI compat, override in prod `.env`.
 - Host firewall: allow `22` (SSH) + `3005` only; Docker bypasses UFW via iptables, so never add DB/Redis `ports:` to the prod file.
 
 ### CI/CD (GitHub Actions)
 
-`.github/workflows/ci.yml` — runs on push/PR to main/master/dev:
+`.github/workflows/ci.yml` — runs on push to main/master only (one run per
+release; docs-only changes ignored; superseded runs auto-cancelled):
 1. Spin up PostgreSQL + Redis (GitHub Actions services)
 2. `npm ci`
 3. `npm run build -w packages/shared`
