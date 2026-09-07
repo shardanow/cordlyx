@@ -179,6 +179,7 @@ This starts PostgreSQL, Redis, the NestJS API, the BullMQ worker, the Next.js fr
 
 ```
 nginx:3005
+  ├── /health         → api:4000 (DB check, no auth)
   ├── /api/v1/*      → api:4000
   ├── /uploads/*     → api:4000
   ├── /socket.io/*   → api:4000 (with WebSocket upgrade)
