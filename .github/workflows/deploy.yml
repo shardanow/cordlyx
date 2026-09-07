@@ -55,6 +55,11 @@ jobs:
 
             $COMPOSE up -d --build
 
+            # nginx.conf is bind-mounted: `up` does not recreate nginx on
+            # config changes, leaving a stale mount (no /health location).
+            # Force-recreate remounts it (~1-2s blip, acceptable here).
+            $COMPOSE up -d --force-recreate nginx
+
             echo "Waiting for PostgreSQL..."
             for i in $(seq 1 30); do
               if $COMPOSE exec -T postgres pg_isready -U cordlyx >/dev/null 2>&1; then
