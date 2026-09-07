@@ -31,10 +31,13 @@ RUN apk add --no-cache tini
 
 ENV NODE_ENV=production
 
+# NOTE: in a monorepo the standalone output is nested
+# (frontend/.next/standalone/frontend/server.js), not server.js at root.
 COPY --from=builder /app/frontend/.next/standalone ./
-COPY --from=builder /app/frontend/.next/static ./.next/static
-COPY --from=builder /app/frontend/public ./public
+COPY --from=builder /app/frontend/.next/static ./frontend/.next/static
+COPY --from=builder /app/frontend/public ./frontend/public
 
+WORKDIR /app/frontend
 EXPOSE 3000
 
 ENTRYPOINT ["/sbin/tini", "--"]
