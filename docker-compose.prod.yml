@@ -4,7 +4,8 @@ services:
     container_name: cordlyx-postgres
     environment:
       POSTGRES_USER: cordlyx
-      POSTGRES_PASSWORD: cordlyx
+      # Override with POSTGRES_PASSWORD in .env for production. Default keeps dev/CI compat.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cordlyx}
       POSTGRES_DB: cordlyx
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -34,11 +35,15 @@ services:
       - uploads:/app/data/uploads
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgres://cordlyx:cordlyx@postgres:5432/cordlyx
+      DATABASE_URL: postgres://cordlyx:${POSTGRES_PASSWORD:-cordlyx}@postgres:5432/cordlyx
       REDIS_URL: redis://redis:6379/0
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      # Required: min 32 chars (see backend/src/config/env.ts). No weak default on purpose —
+      # compose will fail fast if JWT_SECRET is missing instead of crash-looping the API.
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET (32+ chars) in .env}
       JWT_ACCESS_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
       STORAGE_PROVIDER: local
       STORAGE_LOCAL_PATH: ./data/uploads
     depends_on:
@@ -57,7 +62,7 @@ services:
       - uploads:/app/data/uploads
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgres://cordlyx:cordlyx@postgres:5432/cordlyx
+      DATABASE_URL: postgres://cordlyx:${POSTGRES_PASSWORD:-cordlyx}@postgres:5432/cordlyx
       REDIS_URL: redis://redis:6379/0
     depends_on:
       postgres:
@@ -70,6 +75,9 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+      # NEXT_PUBLIC_* is baked at build time — must be a build arg, runtime env alone is not enough.
+      args:
+        NEXT_PUBLIC_API_URL: /api/v1
     container_name: cordlyx-frontend
     environment:
       NODE_ENV: production

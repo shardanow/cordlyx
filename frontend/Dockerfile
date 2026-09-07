@@ -8,6 +8,11 @@ COPY frontend/package.json frontend/package.json
 COPY frontend/tsconfig.json frontend/tsconfig.json
 COPY frontend/next.config.ts frontend/next.config.ts
 
+# NEXT_PUBLIC_* vars are baked into the client bundle at build time,
+# so they must be available as build args (not only runtime env).
+ARG NEXT_PUBLIC_API_URL=/api/v1
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 RUN npm ci
 
 COPY packages/shared/src/ packages/shared/src/
