@@ -4,8 +4,10 @@ WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages/shared/package.json packages/shared/package.json
 COPY packages/shared/tsconfig.json packages/shared/tsconfig.json
+COPY packages/shared/tsconfig.cjs.json packages/shared/tsconfig.cjs.json
 COPY backend/package.json backend/package.json
 COPY backend/tsconfig.json backend/tsconfig.json
+COPY backend/tsconfig.build.json backend/tsconfig.build.json
 COPY backend/nest-cli.json backend/nest-cli.json
 
 RUN npm ci

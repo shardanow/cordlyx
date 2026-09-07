@@ -4,6 +4,7 @@ WORKDIR /app
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages/shared/package.json packages/shared/package.json
 COPY packages/shared/tsconfig.json packages/shared/tsconfig.json
+COPY packages/shared/tsconfig.cjs.json packages/shared/tsconfig.cjs.json
 COPY frontend/package.json frontend/package.json
 COPY frontend/tsconfig.json frontend/tsconfig.json
 COPY frontend/next.config.ts frontend/next.config.ts
@@ -18,6 +19,9 @@ RUN npm ci
 COPY packages/shared/src/ packages/shared/src/
 COPY frontend/ frontend/
 
+# @cordlyx/shared resolves via ./dist (package.json main/exports),
+# so it must be built before the Next.js build.
+RUN npm run build -w packages/shared
 RUN npm run build -w frontend
 
 FROM node:22-alpine AS runner
