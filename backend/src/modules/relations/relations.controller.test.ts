@@ -3,6 +3,10 @@ import { RelationsController } from './relations.controller.js';
 import { RelationsService } from './relations.service.js';
 import { BadRequestException } from '@nestjs/common';
 
+vi.mock('../../common/assert-item.js', () => ({
+  assertItemInProject: vi.fn(async () => ({ id: 'item-a' })),
+}));
+
 describe('RelationsController (unit)', () => {
   const mockRelation = {
     id: 'rel-1',
@@ -22,7 +26,7 @@ describe('RelationsController (unit)', () => {
   it('list should return outgoing and incoming relations', async () => {
     const expected = { outgoing: [mockRelation], incoming: [] };
     const controller = createController({ getByItem: async () => expected });
-    const result = await controller.list('item-a');
+    const result = await controller.list(req, 'item-a');
     expect(result).toEqual(expected);
   });
 
@@ -63,7 +67,7 @@ describe('RelationsController (unit)', () => {
     const spy = vi.fn(async () => ({ success: true }));
     const controller = createController({ delete: spy }, { emit: vi.fn() });
     const result = await controller.delete('rel-1', 'item-a', req, user);
-    expect(spy).toHaveBeenCalledWith('rel-1');
+    expect(spy).toHaveBeenCalledWith('rel-1', 'proj-1');
     expect(result).toEqual({ success: true });
   });
 });

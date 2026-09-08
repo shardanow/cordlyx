@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { api } from '@/lib/api-client';
 import { Bell, CheckCheck } from 'lucide-react';
+import { AvatarCircle } from '@/components/features/AvatarCircle';
 
 interface Notification {
   id: string;
@@ -143,9 +144,7 @@ export default function NotificationsPage() {
 
             const card = (
               <div className="flex items-start gap-3 px-4 py-3">
-                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium shrink-0">
-                  {n.actor?.name?.charAt(0) ?? '?'}
-                </div>
+                <AvatarCircle name={n.actor?.name ?? '?'} avatarUrl={n.actor?.avatarUrl} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm">
                     <span className="font-medium">{n.actor?.name ?? 'Someone'}</span>{' '}

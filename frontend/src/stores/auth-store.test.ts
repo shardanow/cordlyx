@@ -3,11 +3,14 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 const mockPost = vi.fn();
 const mockGet = vi.fn();
 const mockSetAccessToken = vi.fn();
+const mockGetAccessToken = vi.fn(() => null as string | null);
 const mockRefreshAccessToken = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@/lib/api-client', () => ({
   api: { post: mockPost, get: mockGet },
   setAccessToken: mockSetAccessToken,
+  getAccessToken: (...args: unknown[]) => mockGetAccessToken(...args),
+  getRefreshToken: () => localStorage.getItem('refreshToken'),
   refreshAccessToken: mockRefreshAccessToken,
 }));
 
@@ -19,6 +22,9 @@ describe('auth-store', () => {
     mockPost.mockReset();
     mockGet.mockReset();
     mockSetAccessToken.mockReset();
+    mockGetAccessToken.mockReset();
+    mockGetAccessToken.mockReturnValue(null);
+    mockRefreshAccessToken.mockClear();
     mockRefreshAccessToken.mockResolvedValue(undefined);
     localStorage.clear();
     document.cookie = '';
@@ -49,11 +55,14 @@ describe('auth-store', () => {
     expect(useAuthStore.getState().user?.name).toBe('Bob');
   });
 
-  it('logout should clear state and tokens', () => {
+  it('logout should revoke on the server and clear state and tokens', () => {
+    localStorage.setItem('refreshToken', 'refresh-1');
+    mockPost.mockResolvedValue({ success: true });
     useAuthStore.setState({ user: { id: 'u1', email: 'a@b.com', name: 'A', avatarUrl: null }, isAuthenticated: true, isLoading: false });
 
     useAuthStore.getState().logout();
 
+    expect(mockPost).toHaveBeenCalledWith('/auth/logout', { refreshToken: 'refresh-1' });
     expect(mockSetAccessToken).toHaveBeenCalledWith(null);
     expect(localStorage.getItem('refreshToken')).toBeNull();
     expect(useAuthStore.getState().user).toBeNull();
@@ -90,5 +99,16 @@ describe('auth-store', () => {
     expect(useAuthStore.getState().user).toBeNull();
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
     expect(useAuthStore.getState().isLoading).toBe(false);
+  });
+
+  it('loadUser should skip rotation when an access token is already held', async () => {
+    localStorage.setItem('refreshToken', 'refresh-1');
+    mockGetAccessToken.mockReturnValueOnce('access-1');
+    mockGet.mockResolvedValueOnce({ id: 'u1', email: 'a@b.com', name: 'Alice', avatarUrl: null });
+
+    await useAuthStore.getState().loadUser();
+
+    expect(mockRefreshAccessToken).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
   });
 });

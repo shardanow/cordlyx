@@ -31,6 +31,14 @@ export class AuthController {
     return this.authService.refresh(data.refreshToken);
   }
 
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  async logout(@CurrentUser() user: AuthenticatedUser, @Body() body: unknown) {
+    const data = refreshSchema.partial().parse(body);
+    return this.authService.logout(user.id, data.refreshToken ?? null);
+  }
+
   @Patch('change-password')
   @UseGuards(JwtAuthGuard)
   async changePassword(@CurrentUser() user: AuthenticatedUser, @Body() body: unknown) {

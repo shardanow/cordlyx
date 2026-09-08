@@ -8,6 +8,7 @@ import { Target, Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import CreatePlanModal from '@/components/CreatePlanModal';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 
 interface Plan {
   id: string;
@@ -33,6 +34,7 @@ export default function PlansPage() {
   const queryClient = useQueryClient();
   const [showCreate, setShowCreate] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Plan | null>(null);
   const [search, setSearch] = useState('');
 
   const { data: project } = useQuery<{ id: string; name: string }>({
@@ -53,14 +55,15 @@ export default function PlansPage() {
     setEditingPlan(plan);
   };
 
-  const handleDelete = async (planId: string, planName: string) => {
-    if (!confirm(`Delete "${planName}"?`)) return;
+  const handleDelete = async (planId: string) => {
     try {
       await api.delete(`/projects/${slug}/plans/${planId}`);
       queryClient.invalidateQueries({ queryKey: ['plans', slug] });
       toast.success('Plan deleted');
     } catch {
       toast.error('Failed to delete plan');
+    } finally {
+      setDeleteTarget(null);
     }
   };
 
@@ -156,7 +159,7 @@ export default function PlansPage() {
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
                 <button
-                  onClick={() => handleDelete(plan.id, plan.name)}
+                  onClick={() => setDeleteTarget(plan)}
                   className="h-7 w-7 grid place-items-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                   title="Delete plan"
                 >
@@ -175,6 +178,13 @@ export default function PlansPage() {
           <p className="text-sm text-muted-foreground">{search ? 'Try a different search term' : 'Create your first plan to get started'}</p>
         </div>
       )}
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title={`Delete "${deleteTarget?.name ?? ''}"?`}
+        confirmLabel="Delete"
+        onConfirm={() => deleteTarget && void handleDelete(deleteTarget.id)}
+        onClose={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

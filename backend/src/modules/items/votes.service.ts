@@ -39,14 +39,4 @@ export class VotesService {
       .where(eq(itemVotes.itemId, itemId));
     return { count: rows.length, voters: rows.map((r) => r.userId) };
   }
-
-  async hasVoted(itemId: string, userId: string) {
-    const db = getDb();
-    const row = await db
-      .select({ id: itemVotes.id })
-      .from(itemVotes)
-      .where(and(eq(itemVotes.itemId, itemId), eq(itemVotes.userId, userId)))
-      .limit(1);
-    return !!row[0];
-  }
 }

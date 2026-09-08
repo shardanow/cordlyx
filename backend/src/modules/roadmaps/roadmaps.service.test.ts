@@ -79,6 +79,21 @@ describe('RoadmapsService', () => {
     expect(updated.color).toBe('#10B981');
   });
 
+  it('should reorder lanes atomically', async () => {
+    const list = await roadmapsService.list(projectId, {});
+    const roadmap = list[0]!;
+    const a = (await roadmapsService.createLane(roadmap.id, projectId, { name: 'A' }))!;
+    const b = (await roadmapsService.createLane(roadmap.id, projectId, { name: 'B' }))!;
+    const reordered = await roadmapsService.reorderLanes(projectId, roadmap.id, [b.id, a.id]);
+    expect(reordered.map((l: any) => l.id)).toEqual([b.id, a.id]);
+  });
+
+  it('should reject reorder with foreign or duplicate lanes', async () => {
+    const list = await roadmapsService.list(projectId, {});
+    const roadmap = list[0]!;
+    await expect(roadmapsService.reorderLanes(projectId, roadmap.id, [randomUUID()])).rejects.toThrow(/exactly once/);
+  });
+
   it('should delete a roadmap', async () => {
     const list = await roadmapsService.list(projectId, {});
     const roadmap = list.find((r) => r.name === 'Q2 2025');

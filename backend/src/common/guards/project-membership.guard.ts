@@ -25,6 +25,9 @@ export class ProjectMembershipGuard implements CanActivate {
     const cacheKey = `membership:${projectSlug}:${user.id}`;
     const cached = await this.cache.get<{ projectId: string; role: string }>(cacheKey);
     if (cached) {
+      if (request.apiKeyProjectId && request.apiKeyProjectId !== cached.projectId) {
+        throw new ForbiddenException('API key is scoped to another project');
+      }
       request.projectId = cached.projectId;
       request.projectRole = cached.role;
       return true;
@@ -40,6 +43,11 @@ export class ProjectMembershipGuard implements CanActivate {
 
     if (!project[0]) {
       throw new ForbiddenException('Project not found');
+    }
+
+    // Enforce API-key project scope (set by ApiKeyOrJwtAuthGuard)
+    if (request.apiKeyProjectId && request.apiKeyProjectId !== project[0].id) {
+      throw new ForbiddenException('API key is scoped to another project');
     }
 
     const membership = await db

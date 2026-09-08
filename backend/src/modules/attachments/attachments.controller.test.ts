@@ -3,6 +3,10 @@ import { AttachmentsController } from './attachments.controller.js';
 import { AttachmentsService } from './attachments.service.js';
 import { NotFoundException } from '@nestjs/common';
 
+vi.mock('../../common/assert-item.js', () => ({
+  assertItemInProject: vi.fn(async () => ({ id: 'item-1' })),
+}));
+
 describe('AttachmentsController (unit)', () => {
   const mockAttachment = {
     id: 'att-1',
@@ -22,7 +26,7 @@ describe('AttachmentsController (unit)', () => {
 
   it('list should return attachments for item', async () => {
     const controller = createController({ getByItem: async () => [mockAttachment] as any });
-    const result = await controller.list('item-1');
+    const result = await controller.list(req, 'item-1');
     expect(result).toEqual([mockAttachment]);
   });
 

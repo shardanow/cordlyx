@@ -194,14 +194,10 @@ describe('ItemsService', () => {
   });
 
   describe('edge cases', () => {
-    it('should return null when updating non-existent item', async () => {
-      const result = await itemsService.update(
-        projectId,
-        randomUUID(),
-        { title: 'ghost' },
-      );
-      // getById returns null for non-existent item
-      expect(result.item).toBeNull();
+    it('should throw NotFound when updating non-existent item', async () => {
+      await expect(
+        itemsService.update(projectId, randomUUID(), { title: 'ghost' }),
+      ).rejects.toThrow('Item not found');
     });
 
     it('should be idempotent when soft-deleting already deleted item', async () => {
@@ -230,6 +226,72 @@ describe('ItemsService', () => {
       // Verify it no longer appears after delete
       const after = await itemsService.list(projectId, { limit: 50, sort: '-created_at' });
       expect(after.data.some((i) => i.id === created!.id)).toBe(false);
+    });
+  });
+
+  describe('transactions', () => {
+    it('should not consume sequence numbers on failed create', async () => {
+      const db = getDb();
+      const { issueSequences } = await import('../../database/schema/sequences.js');
+      const { eq } = await import('drizzle-orm');
+      const before = await db
+        .select({ lastValue: issueSequences.lastValue })
+        .from(issueSequences)
+        .where(eq(issueSequences.projectId, projectId))
+        .limit(1);
+
+      await expect(
+        itemsService.create(projectId, { title: 'Bad FK', typeId: randomUUID() }, testUser.id),
+      ).rejects.toThrow();
+
+      const after = await db
+        .select({ lastValue: issueSequences.lastValue })
+        .from(issueSequences)
+        .where(eq(issueSequences.projectId, projectId))
+        .limit(1);
+      expect(after[0]!.lastValue).toBe(before[0]!.lastValue);
+    });
+  });
+
+  describe('syncSince', () => {    it('returns touched items with tags and deleted stubs, oldest first', async () => {
+      const since = new Date();
+      // Ensure updatedAt ordering is deterministic
+      await new Promise((r) => setTimeout(r, 10));
+
+      const a = (await itemsService.create(
+        projectId, { title: 'Sync A', typeId: taskTypeId, tagIds: [] }, testUser.id,
+      ))!;
+      const b = (await itemsService.create(
+        projectId, { title: 'Sync B', typeId: taskTypeId }, testUser.id,
+      ))!;
+      await itemsService.update(projectId, a.id, { description: 'touched' });
+      await itemsService.softDelete(projectId, b.id);
+
+      const res = await itemsService.syncSince(projectId, since, 200);
+      const ids = res.data.map((r: any) => r.id);
+      expect(ids).toContain(a.id);
+      expect(ids).toContain(b.id);
+      expect(res.meta.hasMore).toBe(false);
+      expect(res.meta.fullSyncRequired).toBe(false);
+      expect(typeof res.meta.serverTime).toBe('string');
+
+      const stub: any = res.data.find((r: any) => r.id === b.id);
+      expect(stub.deleted).toBe(true);
+
+      const live: any = res.data.find((r: any) => r.id === a.id);
+      expect(live.title).toBe('Sync A');
+      expect(Array.isArray(live.tagIds)).toBe(true);
+
+      // Ascending by updatedAt
+      const times = res.data.map((r: any) => new Date(r.updatedAt).getTime());
+      expect([...times].sort((x, y) => x - y)).toEqual(times);
+    });
+
+    it('flags truncation for full sync fallback', async () => {
+      const res = await itemsService.syncSince(projectId, new Date(0), 1);
+      expect(res.meta.hasMore).toBe(true);
+      expect(res.meta.fullSyncRequired).toBe(true);
+      expect(res.data).toHaveLength(1);
     });
   });
 });

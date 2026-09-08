@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { ActivityQueueService } from './activity-queue.service.js';
+import { ActivityQueueService, type ActivityJobData } from './activity-queue.service.js';
 
 @Injectable()
 export class ActivityEventListener {
@@ -8,9 +8,22 @@ export class ActivityEventListener {
 
   constructor(private readonly activityQueue: ActivityQueueService) {}
 
+  /**
+   * Enqueue an activity write without ever breaking the request path:
+   * when Redis is down the write is dropped but stays visible in logs
+   * (and in /health queue.failed / failedAboveThreshold).
+   */
+  private async enqueue(job: ActivityJobData): Promise<void> {
+    try {
+      await this.activityQueue.write(job);
+    } catch (err) {
+      this.logger.warn(`Activity enqueue failed (${job.action}): ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   @OnEvent('item.created')
   async onItemCreated(payload: { projectId: string; item: { id: string; title: string }; actorId: string }) {
-    await this.activityQueue.write({
+    await this.enqueue({
       projectId: payload.projectId,
       actorId: payload.actorId,
       itemId: payload.item.id,
@@ -28,7 +41,7 @@ export class ActivityEventListener {
     newValue: unknown;
     actorId: string;
   }) {
-    await this.activityQueue.write({
+    await this.enqueue({
       projectId: payload.projectId,
       actorId: payload.actorId,
       itemId: payload.item.id,
@@ -41,7 +54,7 @@ export class ActivityEventListener {
 
   @OnEvent('item.deleted')
   async onItemDeleted(payload: { projectId: string; itemId: string; title?: string; actorId: string }) {
-    await this.activityQueue.write({
+    await this.enqueue({
       projectId: payload.projectId,
       actorId: payload.actorId,
       itemId: payload.itemId,
@@ -58,7 +71,7 @@ export class ActivityEventListener {
     newValue: string | null;
     actorId: string;
   }) {
-    await this.activityQueue.write({
+    await this.enqueue({
       projectId: payload.projectId,
       actorId: payload.actorId,
       itemId: payload.item.id,
@@ -76,7 +89,7 @@ export class ActivityEventListener {
     newValue: string | null;
     actorId: string;
   }) {
-    await this.activityQueue.write({
+    await this.enqueue({
       projectId: payload.projectId,
       actorId: payload.actorId,
       itemId: payload.item.id,
@@ -93,7 +106,7 @@ export class ActivityEventListener {
     comment: { id: string; body?: string };
     actorId: string;
   }) {
-    await this.activityQueue.write({
+    await this.enqueue({
       projectId: payload.projectId,
       actorId: payload.actorId,
       itemId: payload.itemId,
@@ -110,7 +123,7 @@ export class ActivityEventListener {
     commentId: string;
     actorId: string;
   }) {
-    await this.activityQueue.write({
+    await this.enqueue({
       projectId: payload.projectId,
       actorId: payload.actorId,
       itemId: payload.itemId,
@@ -126,7 +139,7 @@ export class ActivityEventListener {
     commentId: string;
     actorId: string;
   }) {
-    await this.activityQueue.write({
+    await this.enqueue({
       projectId: payload.projectId,
       actorId: payload.actorId,
       itemId: payload.itemId,
@@ -142,7 +155,7 @@ export class ActivityEventListener {
     actorId: string;
     filename: string | null;
   }) {
-    await this.activityQueue.write({
+    await this.enqueue({
       projectId: payload.projectId,
       actorId: payload.actorId,
       itemId: payload.itemId,
@@ -157,7 +170,7 @@ export class ActivityEventListener {
     itemId: string;
     actorId: string;
   }) {
-    await this.activityQueue.write({
+    await this.enqueue({
       projectId: payload.projectId,
       actorId: payload.actorId,
       itemId: payload.itemId,
@@ -174,7 +187,7 @@ export class ActivityEventListener {
     targetItemTitle: string | null;
     targetItemSequenceNum: number | null;
   }) {
-    await this.activityQueue.write({
+    await this.enqueue({
       projectId: payload.projectId,
       actorId: payload.actorId,
       itemId: payload.itemId,
@@ -191,7 +204,7 @@ export class ActivityEventListener {
     itemId: string;
     actorId: string;
   }) {
-    await this.activityQueue.write({
+    await this.enqueue({
       projectId: payload.projectId,
       actorId: payload.actorId,
       itemId: payload.itemId,
@@ -207,7 +220,7 @@ export class ActivityEventListener {
     reaction: string;
     actorId: string;
   }) {
-    await this.activityQueue.write({
+    await this.enqueue({
       projectId: payload.projectId,
       actorId: payload.actorId,
       itemId: payload.itemId,
@@ -225,7 +238,7 @@ export class ActivityEventListener {
     reaction: string;
     actorId: string;
   }) {
-    await this.activityQueue.write({
+    await this.enqueue({
       projectId: payload.projectId,
       actorId: payload.actorId,
       itemId: payload.itemId,

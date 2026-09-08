@@ -1,12 +1,12 @@
 import { Controller, Get, Patch, Post, Delete, Body, Query, UseGuards, UseInterceptors, UploadedFile, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { JwtAuthGuard, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
+import { ApiKeyOrJwtAuthGuard, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
 import { UsersService } from './users.service.js';
 import { StorageService } from '../../storage/storage.service.js';
 import { updateUserSchema } from '@cordlyx/shared';
 
 @Controller('users')
-@UseGuards(JwtAuthGuard)
+@UseGuards(ApiKeyOrJwtAuthGuard)
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,

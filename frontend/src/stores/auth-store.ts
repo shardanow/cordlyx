@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { api, setAccessToken, refreshAccessToken } from '@/lib/api-client';
+import { api, setAccessToken, getAccessToken, getRefreshToken, refreshAccessToken } from '@/lib/api-client';
 import { queryClient } from '@/lib/query-client';
 
 function setRefreshCookie(token: string | null) {
@@ -53,22 +53,32 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: () => {
+    const refreshToken = getRefreshToken();
+    if (refreshToken) {
+      // Best-effort server-side revoke; never blocks local logout.
+      api.post('/auth/logout', { refreshToken }).catch(() => {});
+    }
     setAccessToken(null);
     setRefreshCookie(null);
-    localStorage.removeItem('refreshToken');
+    try {
+      localStorage.removeItem('refreshToken');
+    } catch {
+      // ignore storage errors
+    }
     queryClient.clear();
     set({ user: null, isAuthenticated: false });
   },
 
   loadUser: async () => {
     try {
-      const token = localStorage.getItem('refreshToken');
-      if (!token) {
+      if (!getRefreshToken()) {
         set({ isLoading: false });
         return;
       }
-      // Try to get a fresh access token before hitting /users/me
-      await refreshAccessToken();
+      // Skip rotation when we already hold a fresh access token (e.g. right after login).
+      if (!getAccessToken()) {
+        await refreshAccessToken();
+      }
       const user = await api.get<{ id: string; email: string; name: string; avatarUrl: string | null }>('/users/me');
       set({ user, isAuthenticated: true, isLoading: false });
     } catch {

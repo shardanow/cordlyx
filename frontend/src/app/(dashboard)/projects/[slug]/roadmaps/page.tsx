@@ -9,6 +9,7 @@ import { api } from '@/lib/api-client';
 import { Plus, Map, Calendar, ArrowRight, Search, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEscToClose } from '@/hooks/use-esc-to-close';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 
 interface Roadmap {
   id: string;
@@ -31,6 +32,7 @@ export default function RoadmapsPage() {
   const [newStart, setNewStart] = useState('');
   const [newEnd, setNewEnd] = useState('');
   const [newColor, setNewColor] = useState('#6366f1');
+  const [deleteTarget, setDeleteTarget] = useState<Roadmap | null>(null);
 
   const { data: project } = useQuery<{ id: string; name: string }>({
     queryKey: ['project', slug],
@@ -98,14 +100,15 @@ export default function RoadmapsPage() {
     }
   };
 
-  const handleDelete = async (roadmapId: string, name: string) => {
-    if (!confirm(`Delete "${name}"?`)) return;
+  const handleDelete = async (roadmapId: string) => {
     try {
       await api.delete(`/projects/${slug}/roadmaps/${roadmapId}`);
       queryClient.invalidateQueries({ queryKey: ['roadmaps', slug] });
       toast.success('Roadmap deleted');
     } catch {
       toast.error('Failed to delete roadmap');
+    } finally {
+      setDeleteTarget(null);
     }
   };
 
@@ -211,7 +214,7 @@ export default function RoadmapsPage() {
                 <Pencil className="w-4 h-4" />
               </button>
               <button
-                onClick={(e) => { e.stopPropagation(); handleDelete(roadmap.id, roadmap.name); }}
+                onClick={(e) => { e.stopPropagation(); setDeleteTarget(roadmap); }}
                 className="h-9 px-3 rounded-lg text-muted-foreground text-xs font-bold hover:text-destructive hover:bg-destructive/10 transition-colors"
               >
                 Delete
@@ -295,6 +298,13 @@ export default function RoadmapsPage() {
         </div>,
         document.body,
       )}
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title={`Delete "${deleteTarget?.name ?? ''}"?`}
+        confirmLabel="Delete"
+        onConfirm={() => deleteTarget && void handleDelete(deleteTarget.id)}
+        onClose={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

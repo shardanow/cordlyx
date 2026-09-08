@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CommentsController } from './comments.controller.js';
 
+vi.mock('../../common/assert-item.js', () => ({
+  assertItemInProject: vi.fn(async () => ({ id: 'item-1' })),
+}));
+
 describe('CommentsController', () => {
   let controller: CommentsController;
   let mockService: Record<string, ReturnType<typeof vi.fn>>;
@@ -24,7 +28,7 @@ describe('CommentsController', () => {
     it('should return comments for item', async () => {
       const comments = [{ id: 'c-1', body: 'Hello' }];
       mockService.getByItem.mockResolvedValueOnce(comments);
-      const result = await controller.list('item-1');
+      const result = await controller.list(mockReq as any, 'item-1');
       expect(result).toEqual(comments);
       expect(mockService.getByItem).toHaveBeenCalledWith('item-1');
     });
@@ -64,11 +68,11 @@ describe('CommentsController', () => {
     it('should update comment and emit event', async () => {
       mockService.update.mockResolvedValueOnce({ id: 'c-1', body: 'Edited' });
 
-      const result = await controller.update(mockReq as any, 'item-1', 'c-1', { body: 'Edited' });
+      const result = await controller.update(mockReq as any, 'item-1', 'c-1', { id: 'u-1' } as any, { body: 'Edited' });
 
-      expect(mockService.update).toHaveBeenCalledWith('c-1', 'Edited');
+      expect(mockService.update).toHaveBeenCalledWith('proj-1', 'item-1', 'c-1', 'Edited');
       expect(mockEmitter.emit).toHaveBeenCalledWith('comment.updated', {
-        projectId: 'proj-1', itemId: 'item-1', commentId: 'c-1',
+        projectId: 'proj-1', itemId: 'item-1', commentId: 'c-1', actorId: 'u-1',
       });
       expect(result).toEqual({ id: 'c-1', body: 'Edited' });
     });
@@ -78,11 +82,11 @@ describe('CommentsController', () => {
     it('should soft-delete comment and emit event', async () => {
       mockService.softDelete.mockResolvedValueOnce({ success: true });
 
-      const result = await controller.delete(mockReq as any, 'item-1', 'c-1');
+      const result = await controller.delete(mockReq as any, 'item-1', 'c-1', { id: 'u-1' } as any);
 
-      expect(mockService.softDelete).toHaveBeenCalledWith('c-1');
+      expect(mockService.softDelete).toHaveBeenCalledWith('proj-1', 'item-1', 'c-1');
       expect(mockEmitter.emit).toHaveBeenCalledWith('comment.deleted', {
-        projectId: 'proj-1', itemId: 'item-1', commentId: 'c-1',
+        projectId: 'proj-1', itemId: 'item-1', commentId: 'c-1', actorId: 'u-1',
       });
       expect(result).toEqual({ success: true });
     });

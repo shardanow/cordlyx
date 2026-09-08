@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
 import { Shield, Users, FolderOpen, Search, Lock, BarChart3, Activity, Archive, ChevronDown, ChevronRight } from 'lucide-react';
+import { AvatarCircle } from '@/components/features/AvatarCircle';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 
 interface AdminUser {
   id: string;
@@ -40,6 +42,7 @@ interface ProjectMember {
   role: string;
   name: string;
   email: string;
+  avatarUrl: string | null;
 }
 
 interface ActivityItem {
@@ -49,7 +52,7 @@ interface ActivityItem {
   oldValue: unknown;
   newValue: unknown;
   createdAt: string;
-  actor: { id: string; name: string; email: string } | null;
+  actor: { id: string; name: string; email: string; avatarUrl: string | null } | null;
   projectName: string | null;
   projectSlug: string | null;
 }
@@ -173,6 +176,7 @@ function AdminStatsCards() {
 
 function UsersTab({ search }: { search: string }) {
   const queryClient = useQueryClient();
+  const [deactivateTarget, setDeactivateTarget] = useState<AdminUser | null>(null);
   const { data: users, isLoading } = useQuery<AdminUser[]>({
     queryKey: ['admin', 'users'],
     queryFn: () => api.get('/admin/users'),
@@ -189,9 +193,9 @@ function UsersTab({ search }: { search: string }) {
   };
 
   const deactivate = async (id: string) => {
-    if (!confirm('Deactivate this user? They will lose access to all projects.')) return;
     await api.patch(`/admin/users/${id}/deactivate`, {});
     queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+    setDeactivateTarget(null);
   };
 
   return (
@@ -204,9 +208,7 @@ function UsersTab({ search }: { search: string }) {
         <div className="divide-y divide-border">
           {filtered.map((u) => (
             <div key={u.id} className="flex items-center gap-3 px-4 py-3">
-              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium shrink-0">
-                {u.name.charAt(0)}
-              </div>
+              <AvatarCircle name={u.name} avatarUrl={u.avatarUrl} size="md" />
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">{u.name}</div>
                 <div className="text-xs text-muted-foreground truncate">
@@ -232,7 +234,7 @@ function UsersTab({ search }: { search: string }) {
               )}
               {u.isActive && (
                 <button
-                  onClick={() => deactivate(u.id)}
+                  onClick={() => setDeactivateTarget(u)}
                   className="text-xs text-destructive hover:text-destructive/80 px-2 py-1 rounded hover:bg-destructive/10 transition-colors"
                 >
                   Deactivate
@@ -242,6 +244,14 @@ function UsersTab({ search }: { search: string }) {
           ))}
         </div>
       )}
+      <ConfirmModal
+        open={deactivateTarget !== null}
+        title={`Deactivate ${deactivateTarget?.name ?? 'this user'}?`}
+        message="They will lose access to all projects."
+        confirmLabel="Deactivate"
+        onConfirm={() => deactivateTarget && void deactivate(deactivateTarget.id)}
+        onClose={() => setDeactivateTarget(null)}
+      />
     </div>
   );
 }
@@ -260,6 +270,9 @@ function ProjectsTab({
   setRoleChanges: (updates: Record<string, string>) => void;
 }) {
   const queryClient = useQueryClient();
+  const [confirmState, setConfirmState] = useState<
+    { kind: 'archive' | 'delete'; project: AdminProject } | null
+  >(null);
   const { data: projects, isLoading } = useQuery<AdminProject[]>({
     queryKey: ['admin', 'projects'],
     queryFn: () => api.get('/admin/projects'),
@@ -276,9 +289,15 @@ function ProjectsTab({
   );
 
   const archive = async (id: string) => {
-    if (!confirm('Archive this project?')) return;
     await api.patch(`/admin/projects/${id}/archive`, {});
     queryClient.invalidateQueries({ queryKey: ['admin', 'projects'] });
+    setConfirmState(null);
+  };
+
+  const destroy = async (id: string) => {
+    await api.delete(`/admin/projects/${id}`);
+    queryClient.invalidateQueries({ queryKey: ['admin', 'projects'] });
+    setConfirmState(null);
   };
 
   const changeRole = async (projectId: string, memberId: string, role: string) => {
@@ -325,18 +344,14 @@ function ProjectsTab({
                 {!p.isArchived && (
                   <>
                     <button
-                      onClick={() => archive(p.id)}
+                      onClick={() => setConfirmState({ kind: 'archive', project: p })}
                       className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors"
                     >
                       <Archive className="w-3.5 h-3.5" />
                       Archive
                     </button>
                     <button
-                      onClick={async () => {
-                        if (!confirm(`Permanently delete "${p.name}"? This cannot be undone.`)) return;
-                        await api.delete(`/admin/projects/${p.id}`);
-                        queryClient.invalidateQueries({ queryKey: ['admin', 'projects'] });
-                      }}
+                      onClick={() => setConfirmState({ kind: 'delete', project: p })}
                       className="inline-flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 px-2 py-1 rounded hover:bg-destructive/10 transition-colors"
                     >
                       Delete
@@ -354,9 +369,7 @@ function ProjectsTab({
                   ) : (
                     members.map((m) => (
                       <div key={m.id} className="flex items-center gap-3">
-                        <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-medium shrink-0">
-                          {m.name.charAt(0)}
-                        </div>
+                        <AvatarCircle name={m.name} avatarUrl={m.avatarUrl} size="xs" />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-medium truncate">{m.name}</p>
                           <p className="text-[10px] text-muted-foreground truncate">{m.email}</p>
@@ -387,6 +400,17 @@ function ProjectsTab({
           ))}
         </div>
       )}
+      <ConfirmModal
+        open={confirmState !== null}
+        title={confirmState?.kind === 'archive' ? `Archive "${confirmState?.project.name ?? ''}"?` : `Permanently delete "${confirmState?.project.name ?? ''}"?`}
+        message={confirmState?.kind === 'archive' ? undefined : 'This cannot be undone.'}
+        confirmLabel={confirmState?.kind === 'archive' ? 'Archive' : 'Delete'}
+        onConfirm={() => {
+          if (!confirmState) return;
+          void (confirmState.kind === 'archive' ? archive(confirmState.project.id) : destroy(confirmState.project.id));
+        }}
+        onClose={() => setConfirmState(null)}
+      />
     </div>
   );
 }
@@ -396,6 +420,7 @@ function ActivityTab() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [fetched, setFetched] = useState(false);
 
   const fetchPage = async (c: string | null) => {
     setLoading(true);
@@ -412,8 +437,10 @@ function ActivityTab() {
   };
 
   // Fetch on mount
-  const [fetched, setFetched] = useState(false);
-  if (!fetched) { setTimeout(() => { fetchPage(null); setFetched(true); }, 0); }
+  useEffect(() => {
+    void fetchPage(null).finally(() => setFetched(true));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="border border-border rounded-xl overflow-hidden">
@@ -426,9 +453,7 @@ function ActivityTab() {
       <div className="divide-y divide-border max-h-[600px] overflow-y-auto">
         {items.map((a) => (
           <div key={a.id} className="flex items-start gap-3 px-4 py-2.5">
-            <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-medium shrink-0 mt-0.5">
-              {a.actor?.name?.charAt(0) ?? '?'}
-            </div>
+            <AvatarCircle name={a.actor?.name ?? '?'} avatarUrl={a.actor?.avatarUrl} size="xs" className="mt-0.5" />
             <div className="flex-1 min-w-0">
               <p className="text-xs">
                 <span className="font-medium">{a.actor?.name ?? 'System'}</span>{' '}

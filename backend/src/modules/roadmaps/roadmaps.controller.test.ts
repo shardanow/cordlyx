@@ -5,8 +5,11 @@ import { RoadmapsService } from './roadmaps.service.js';
 describe('RoadmapsController', () => {
   const mockRoadmap = { id: 'rm-1', projectId: 'proj-1', name: 'Q1', startDate: '2025-01-01', endDate: '2025-03-31', color: '#3B82F6', sortOrder: 0 };
 
-  function createController(mockService: Partial<RoadmapsService>) {
-    return new RoadmapsController(mockService as RoadmapsService);
+  function createController(mockService: Partial<RoadmapsService>, mockTransfer?: Record<string, ReturnType<typeof vi.fn>>) {
+    return new RoadmapsController(
+      mockService as RoadmapsService,
+      (mockTransfer ?? { exportAll: vi.fn(), exportRoadmap: vi.fn(), importFile: vi.fn() }) as any,
+    );
   }
 
   const req = { projectId: 'proj-1' } as any;

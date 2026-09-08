@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../../database/client.js';
 import { comments } from '../../database/schema/comments.js';
+import { items } from '../../database/schema/items.js';
 import { users } from '../../database/schema/users.js';
 import { eq, and, isNull } from 'drizzle-orm';
 import { ReactionsService } from './reactions.service.js';
@@ -80,8 +81,9 @@ export class CommentsService {
     return comment;
   }
 
-  async update(commentId: string, body: string) {
+  async update(projectId: string, itemId: string, commentId: string, body: string) {
     const db = getDb();
+    await this.assertCommentInProject(projectId, itemId, commentId);
     await db
       .update(comments)
       .set({ body, updatedAt: new Date() })
@@ -95,12 +97,31 @@ export class CommentsService {
     return comment;
   }
 
-  async softDelete(commentId: string) {
+  async softDelete(projectId: string, itemId: string, commentId: string) {
     const db = getDb();
+    await this.assertCommentInProject(projectId, itemId, commentId);
     await db
       .update(comments)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
       .where(eq(comments.id, commentId));
     return { success: true };
+  }
+
+  private async assertCommentInProject(projectId: string, itemId: string, commentId: string): Promise<void> {
+    const db = getDb();
+    const [row] = await db
+      .select({ id: comments.id })
+      .from(comments)
+      .innerJoin(items, eq(comments.itemId, items.id))
+      .where(
+        and(
+          eq(comments.id, commentId),
+          eq(comments.itemId, itemId),
+          eq(items.projectId, projectId),
+          isNull(items.deletedAt),
+        ),
+      )
+      .limit(1);
+    if (!row) throw new NotFoundException('Comment not found');
   }
 }

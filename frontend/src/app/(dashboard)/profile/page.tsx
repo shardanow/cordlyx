@@ -5,6 +5,8 @@ import { useAuthStore } from '@/stores/auth-store';
 import { api, getAccessToken } from '@/lib/api-client';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
+import NotificationPrefs from '@/components/NotificationPrefs';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 
 interface ApiKey {
   id: string;
@@ -13,12 +15,17 @@ interface ApiKey {
   projectId: string | null;
   expiresAt: string | null;
   lastUsedAt: string | null;
+  rateLimitPerMin: number;
   createdAt: string;
 }
 
 function avatarSrc(url: string | null | undefined): string | null {
   if (!url) return null;
-  return url.startsWith('/uploads/') ? `http://localhost:4000${url}` : url;
+  if (url.startsWith('/uploads/')) {
+    const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1').replace(/\/api\/v1\/?$/, '');
+    return `${apiBase}${url}`;
+  }
+  return url;
 }
 
 export default function ProfilePage() {
@@ -124,12 +131,6 @@ export default function ProfilePage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create API key');
     }
-  };
-
-  const handleRevokeKey = async (id: string) => {
-    if (!confirm('Revoke this API key? This action cannot be undone.')) return;
-    await api.delete(`/api-keys/${id}`);
-    refetchKeys();
   };
 
   const handleCopy = async () => {
@@ -341,22 +342,7 @@ export default function ProfilePage() {
         {apiKeys && apiKeys.length > 0 && (
           <div className="mb-4 border border-border rounded divide-y divide-border">
             {apiKeys.map((key) => (
-              <div key={key.id} className="flex items-center justify-between px-3 py-2.5">
-                <div>
-                  <p className="text-sm font-medium">{key.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    <code className="font-mono">{key.keyPrefix}...</code>
-                    {key.lastUsedAt ? ` · Last used ${new Date(key.lastUsedAt).toLocaleDateString()}` : ' · Never used'}
-                    {key.expiresAt ? ` · Expires ${new Date(key.expiresAt).toLocaleDateString()}` : ''}
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleRevokeKey(key.id)}
-                  className="text-xs text-destructive hover:text-destructive/80 px-2 py-1 rounded hover:bg-destructive/10 transition-colors"
-                >
-                  Revoke
-                </button>
-              </div>
+              <ApiKeyRow key={key.id} apiKey={key} onChanged={() => refetchKeys()} />
             ))}
           </div>
         )}
@@ -377,6 +363,100 @@ export default function ProfilePage() {
           </button>
         </form>
       </div>
+
+      <NotificationPrefs />
+    </div>
+  );
+}
+
+function ApiKeyRow({ apiKey, onChanged }: { apiKey: ApiKey; onChanged: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const [limit, setLimit] = useState(String(apiKey.rateLimitPerMin ?? 120));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const save = async () => {
+    const value = Number(limit);
+    if (!Number.isInteger(value) || value < 1 || value > 10000) {
+      setError('Enter an integer between 1 and 10000');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      await api.patch(`/api-keys/${apiKey.id}`, { rateLimitPerMin: value });
+      setEditing(false);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update key');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const revoke = async () => {
+    await api.delete(`/api-keys/${apiKey.id}`);
+    onChanged();
+  };
+
+  return (
+    <div className="px-3 py-2.5">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium">{apiKey.name}</p>
+          <p className="text-xs text-muted-foreground">
+            <code className="font-mono">{apiKey.keyPrefix}...</code>
+            {apiKey.lastUsedAt ? ` · Last used ${new Date(apiKey.lastUsedAt).toLocaleDateString()}` : ' · Never used'}
+            {apiKey.expiresAt ? ` · Expires ${new Date(apiKey.expiresAt).toLocaleDateString()}` : ''}
+            {` · ${apiKey.rateLimitPerMin ?? 120} req/min`}
+          </p>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={() => { setEditing((e) => !e); setError(''); setLimit(String(apiKey.rateLimitPerMin ?? 120)); }}
+            className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors"
+          >
+            Limit
+          </button>
+          <button
+            onClick={() => setConfirmRevoke(true)}
+            className="text-xs text-destructive hover:text-destructive/80 px-2 py-1 rounded hover:bg-destructive/10 transition-colors"
+          >
+            Revoke
+          </button>
+        </div>
+      </div>
+      {editing && (
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            type="number"
+            min={1}
+            max={10000}
+            value={limit}
+            onChange={(e) => setLimit(e.target.value)}
+            className="h-8 w-28 rounded-md border border-input bg-background px-2 text-xs"
+            aria-label="Requests per minute"
+          />
+          <span className="text-xs text-muted-foreground">req/min</span>
+          <button
+            onClick={() => void save()}
+            disabled={saving}
+            className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+          {error && <span className="text-xs text-destructive">{error}</span>}
+        </div>
+      )}
+      <ConfirmModal
+        open={confirmRevoke}
+        title={`Revoke "${apiKey.name}"?`}
+        message="This action cannot be undone."
+        confirmLabel="Revoke"
+        onConfirm={() => void revoke()}
+        onClose={() => setConfirmRevoke(false)}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { NotificationsService } from './notifications.service.js';
+import { NotificationPrefsService } from './notification-prefs.service.js';
 import { EventsGateway } from '../events/events.gateway.js';
 import { getDb } from '../../database/client.js';
 import { projects } from '../../database/schema/projects.js';
@@ -15,6 +16,7 @@ export class NotificationEventListener {
   constructor(
     private readonly notificationsService: NotificationsService,
     private readonly eventsGateway: EventsGateway,
+    private readonly prefsService: NotificationPrefsService,
   ) {}
 
   private async getProjectSlug(projectId: string): Promise<string | null> {
@@ -55,6 +57,7 @@ export class NotificationEventListener {
     for (const label of mentions) {
       const memberIds = await this.notificationsService.findMembersByMention(projectId, label);
       for (const userId of memberIds) {
+        if (await this.prefsService.isMuted(userId, projectId)) continue;
         const notification = await this.notificationsService.create({
           userId,
           actorId,
@@ -116,6 +119,7 @@ export class NotificationEventListener {
     const newAssigneeId = payload.item.assigneeId;
 
     if (newAssigneeId && newAssigneeId !== payload.oldAssigneeId) {
+      if (await this.prefsService.isMuted(newAssigneeId, payload.projectId)) return;
       const [projectSlug, itemInfo] = await Promise.all([
         this.getProjectSlug(payload.projectId),
         this.getItemInfo(payload.item.id),
@@ -149,6 +153,7 @@ export class NotificationEventListener {
       .where(eq(comments.id, payload.commentId))
       .limit(1);
     if (!comment || comment.authorId === payload.actorId) return; // skip self-reaction
+    if (comment.authorId && (await this.prefsService.isMuted(comment.authorId, payload.projectId))) return;
 
     const [projectSlug, itemInfo] = await Promise.all([
       this.getProjectSlug(payload.projectId),

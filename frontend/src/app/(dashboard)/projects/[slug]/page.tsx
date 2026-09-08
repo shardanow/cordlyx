@@ -12,6 +12,13 @@ import { useEscToClose } from '@/hooks/use-esc-to-close';
 import { getAccessToken } from '@/lib/api-client';
 import { toast } from 'sonner';
 import QuickCreateModal from '@/components/QuickCreateModal';
+import ImportItemsModal from '@/components/ImportItemsModal';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { TypeBadge } from '@/components/features/TypeBadge';
+import { StatusDot } from '@/components/features/StatusDot';
+import { AssigneePicker } from '@/components/features/AssigneePicker';
+import { FilterBar } from '@/components/features/FilterBar';
+import { useProjectData } from '@/lib/project-data';
 import { AvatarCircle } from '@/components/features/AvatarCircle';
 import { TypeIcon } from '@/components/features/TypeIcon';
 import { Select, SelectTrigger, SelectContent, SelectOption } from '@/components/ui/select';
@@ -21,22 +28,6 @@ import {
   RotateCcw, Bookmark, ChevronLeft, ChevronRight,
   CircleDot, ListTodo, Trash2, ArrowUp, ArrowDown,
 } from 'lucide-react';
-
-interface ItemType {
-  id: string; name: string; color: string; icon: string | null;
-}
-
-interface ItemStatus {
-  id: string; name: string; color: string; category: string;
-}
-
-interface ItemPriority {
-  id: string; name: string; color: string | null; icon: string | null;
-}
-
-interface ProjectMember {
-  id: string; userId: string; role: string; name: string; email: string; avatarUrl: string | null; joinedAt: string;
-}
 
 interface Tag {
   id: string; name: string; color: string | null;
@@ -71,11 +62,13 @@ export default function ProjectItemsPage() {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saveViewName, setSaveViewName] = useState('');
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEscToClose(() => setShowSaveModal(false), showSaveModal);
 
-  const { savedViews, saveView, deleteView, loadView } = useSavedViews(slug!);
+  const { savedViews, defaultView, saveView, deleteView, shareView, setDefaultView, loadView } = useSavedViews(slug!);
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -112,26 +105,67 @@ export default function ProjectItemsPage() {
     planId: filterPlan,
   };
 
-  const handleSaveView = () => {
+  const handleSaveView = async () => {
     if (!saveViewName.trim()) return;
-    saveView(saveViewName.trim(), currentFilters);
-    setSaveViewName('');
-    setShowSaveModal(false);
+    try {
+      await saveView(saveViewName.trim(), currentFilters);
+      setSaveViewName('');
+      setShowSaveModal(false);
+      toast.success('View saved');
+    } catch {
+      toast.error('Failed to save view');
+    }
   };
 
   const handleLoadView = (view: typeof savedViews[0]) => {
     const f = loadView(view);
-    setFilterType(f.typeId);
-    setFilterStatus(f.statusId);
-    setFilterPriority(f.priorityId);
-    setFilterAssignee(f.assigneeId);
+    setFilterType(f.typeId ?? '');
+    setFilterStatus(f.statusId ?? '');
+    setFilterPriority(f.priorityId ?? '');
+    setFilterAssignee(f.assigneeId ?? '');
+    setFilterPlan(f.planId ?? '');
+    setSearch(f.search ?? '');
+    setDebouncedSearch(f.search ?? '');
     setActiveTab(view.id);
   };
 
-  const handleDeleteView = (e: React.MouseEvent, id: string) => {
+  // Apply the project default view once (unless the user already filtered).
+  const defaultApplied = useRef(false);
+  useEffect(() => {
+    if (defaultApplied.current || !defaultView) return;
+    defaultApplied.current = true;
+    if (!hasFilters) handleLoadView(defaultView);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultView]);
+
+  const handleDeleteView = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    deleteView(id);
-    if (activeTab === id) setActiveTab('all');
+    try {
+      await deleteView(id);
+      if (activeTab === id) setActiveTab('all');
+    } catch {
+      toast.error('Failed to delete view');
+    }
+  };
+
+  const handleShareView = async (e: React.MouseEvent, view: typeof savedViews[0]) => {
+    e.stopPropagation();
+    try {
+      await shareView(view.id, !view.isShared);
+      toast.success(view.isShared ? 'View is now private' : 'View shared with the project');
+    } catch {
+      toast.error('Failed to update view');
+    }
+  };
+
+  const handleDefaultView = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    try {
+      await setDefaultView(id);
+      toast.success('Default view updated');
+    } catch {
+      toast.error('Only project admins can set the default view');
+    }
   };
 
   const handleTabClick = (tab: string) => {
@@ -176,31 +210,7 @@ export default function ProjectItemsPage() {
     placeholderData: (previousData) => previousData,
   });
 
-  const { data: types } = useQuery<ItemType[]>({
-    queryKey: ['types', slug],
-    queryFn: () => api.get(`/projects/${slug}/types`),
-  });
-
-  const { data: statuses } = useQuery<ItemStatus[]>({
-    queryKey: ['statuses', slug],
-    queryFn: () => api.get(`/projects/${slug}/statuses`),
-  });
-
-  const { data: priorities } = useQuery<ItemPriority[]>({
-    queryKey: ['priorities', slug],
-    queryFn: () => api.get(`/projects/${slug}/priorities`),
-  });
-
-  const { data: members } = useQuery<ProjectMember[]>({
-    queryKey: ['members', slug],
-    queryFn: () => api.get(`/projects/${slug}/members`),
-  });
-
-  interface Plan { id: string; name: string; color: string | null; }
-  const { data: plans } = useQuery<Plan[]>({
-    queryKey: ['plans', slug],
-    queryFn: () => api.get(`/projects/${slug}/plans`),
-  });
+  const { types, statuses, priorities, members, plans } = useProjectData(slug);
 
   const handleUpdate = async (itemId: string, field: string, value: string | null) => {
     try {
@@ -213,13 +223,14 @@ export default function ProjectItemsPage() {
   };
 
   const handleDeleteItem = async (itemId: string) => {
-    if (!window.confirm('Are you sure you want to delete this item?')) return;
     try {
       await api.delete(`/projects/${slug}/items/${itemId}`);
       queryClient.invalidateQueries({ queryKey: ['items', slug] });
       toast.success('Item deleted');
     } catch {
       toast.error('Failed to delete item');
+    } finally {
+      setDeleteTarget(null);
     }
   };
 
@@ -257,10 +268,6 @@ export default function ProjectItemsPage() {
       </div>
     </div>
   );
-
-  const filterSelectClass = (hasValue: boolean) =>
-    `h-[50px] inline-flex items-center gap-2.5 px-3.5 rounded-[10px] text-sm border ${hasValue ? 'border-border text-foreground' : 'border-border text-muted-foreground'
-    } bg-muted/50 cursor-pointer w-full transition-colors hover:bg-muted`;
 
   const sortArrow = (active: boolean, asc: boolean) => {
     if (!active) return null;
@@ -310,6 +317,12 @@ export default function ProjectItemsPage() {
               Export CSV
             </button>
             <button
+              onClick={() => setImportOpen(true)}
+              className="h-[46px] md:h-[50px] px-4 md:px-5 rounded-[10px] border border-border bg-card text-sm font-bold text-foreground hover:bg-muted transition-colors inline-flex items-center gap-2.5"
+            >
+              Import
+            </button>
+            <button
               onClick={() => setQuickCreateOpen(true)}
               className="h-[46px] md:h-[50px] px-5 md:px-6 rounded-[10px] bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition-all inline-flex items-center gap-2.5"
             >
@@ -323,7 +336,7 @@ export default function ProjectItemsPage() {
       {/* Save View Modal */}
       {showSaveModal && createPortal(
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onPointerDown={() => setShowSaveModal(false)}>
-          <div className="bg-card border border-border rounded-lg shadow-xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+          <div className="bg-card border border-border rounded-lg shadow-xl p-5 w-full max-w-sm max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
             <h3 className="font-medium mb-3">Save current filter view</h3>
             <input
               type="text"
@@ -333,10 +346,48 @@ export default function ProjectItemsPage() {
               autoFocus
               className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm mb-3 placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-2 mb-4">
               <button onClick={() => setShowSaveModal(false)} className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground">Cancel</button>
-              <button onClick={handleSaveView} disabled={!saveViewName.trim()} className="bg-primary text-primary-foreground px-4 py-1.5 rounded text-sm font-medium disabled:opacity-50">Save</button>
+              <button onClick={() => void handleSaveView()} disabled={!saveViewName.trim()} className="bg-primary text-primary-foreground px-4 py-1.5 rounded text-sm font-medium disabled:opacity-50">Save</button>
             </div>
+            {savedViews.length > 0 && (
+              <>
+                <h4 className="text-xs font-bold text-muted-foreground mb-2">Saved views</h4>
+                <div className="space-y-1">
+                  {savedViews.map((view) => (
+                    <div key={view.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50 text-sm">
+                      <span className="flex-1 truncate font-medium">{view.name}</span>
+                      {view.isDefault && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-bold">default</span>
+                      )}
+                      {view.isShared && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-bold">shared</span>
+                      )}
+                      <button
+                        onClick={(e) => void handleShareView(e, view)}
+                        title={view.isShared ? 'Make private' : 'Share with project'}
+                        className="text-[11px] text-muted-foreground hover:text-foreground"
+                      >
+                        {view.isShared ? 'Unshare' : 'Share'}
+                      </button>
+                      {!view.isDefault && (
+                        <button
+                          onClick={(e) => void handleDefaultView(e, view.id)}
+                          title="Set as project default (admin)"
+                          className="text-[11px] text-muted-foreground hover:text-foreground"
+                        >
+                          Default
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => void handleDeleteView(e, view.id)}
+                        className="text-muted-foreground hover:text-red-400 transition-colors cursor-pointer"
+                      >✕</button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>,
         document.body,
@@ -369,9 +420,10 @@ export default function ProjectItemsPage() {
                 }`}
             >
               {view.name}
+              {view.isShared && <span className="text-[9px] px-1 rounded bg-muted font-bold">shared</span>}
               <span
-                onClick={(e) => handleDeleteView(e as any, view.id)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleDeleteView(e as any, view.id); }}
+                onClick={(e) => void handleDeleteView(e, view.id)}
+                onKeyDown={(e) => { if (e.key === 'Enter') void handleDeleteView(e as any, view.id); }}
                 role="button"
                 tabIndex={0}
                 className="text-muted-foreground hover:text-red-400 transition-colors ml-0.5 cursor-pointer"
@@ -382,122 +434,30 @@ export default function ProjectItemsPage() {
         </div>
       </div>
 
-      {/* Filter toolbar */}
-      <div className="bg-card border border-border rounded-[14px] mb-5 md:mb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,300px)_repeat(5,minmax(0,180px))_auto] gap-2.5 p-4 md:p-5">
-          {/* Search */}
-          <label className="h-[50px] flex items-center gap-2.5 px-3.5 rounded-[10px] border border-border bg-muted/50 cursor-text transition-colors focus-within:ring-1 focus-within:ring-ring">
-            <Search className="w-4 h-4 text-muted-foreground shrink-0" />
-            <input
-              ref={searchRef}
-              type="text"
-              placeholder="Search items..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none border-0 min-w-0"
-            />
-            {debouncedSearch && (
-              <button onClick={() => { setSearch(''); setDebouncedSearch(''); searchRef.current?.focus(); }} className="text-muted-foreground hover:text-foreground shrink-0">✕</button>
-            )}
-          </label>
-
-          {/* Type filter */}
-          <Select value={filterType} onChange={setFilterType}>
-            <SelectTrigger className={filterSelectClass(!!filterType)}>
-              <ListTodo className="w-4 h-4 shrink-0" />
-              <span className="truncate">{filterType ? types?.find((t) => t.id === filterType)?.name ?? 'All' : 'Type: All'}</span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectOption value=""><ListTodo className="w-4 h-4" />All types</SelectOption>
-              {(types ?? []).map((t) => (
-                <SelectOption key={t.id} value={t.id}>
-                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
-                  {t.name}
-                </SelectOption>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Status filter */}
-          <Select value={filterStatus} onChange={setFilterStatus}>
-            <SelectTrigger className={filterSelectClass(!!filterStatus)}>
-              <CircleDot className="w-4 h-4 shrink-0" />
-              <span className="truncate">{filterStatus ? statuses?.find((s) => s.id === filterStatus)?.name ?? 'All' : 'Status: All'}</span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectOption value=""><CircleDot className="w-4 h-4" />All statuses</SelectOption>
-              {(statuses ?? []).map((s) => (
-                <SelectOption key={s.id} value={s.id}>
-                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-                  {s.name}
-                </SelectOption>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Priority filter */}
-          <Select value={filterPriority} onChange={setFilterPriority}>
-            <SelectTrigger className={filterSelectClass(!!filterPriority)}>
-              <Flag className="w-4 h-4 shrink-0" />
-              <span className="truncate">{filterPriority ? priorities?.find((p) => p.id === filterPriority)?.name ?? 'All' : 'Priority: All'}</span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectOption value=""><Flag className="w-4 h-4" />All priorities</SelectOption>
-              {(priorities ?? []).map((p) => (
-                <SelectOption key={p.id} value={p.id}>
-                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color ?? '#888' }} />
-                  {p.name}
-                </SelectOption>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Assignee filter */}
-          <Select value={filterAssignee} onChange={setFilterAssignee}>
-            <SelectTrigger className={filterSelectClass(!!filterAssignee)}>
-              <User className="w-4 h-4 shrink-0" />
-              <span className="truncate">{filterAssignee ? members?.find((m) => m.userId === filterAssignee)?.name ?? 'All' : 'Assignee: All'}</span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectOption value=""><User className="w-4 h-4" />All assignees</SelectOption>
-              {(members ?? []).map((m) => (
-                <SelectOption key={m.userId} value={m.userId}>
-                  <AvatarCircle name={m.name} />
-                  {m.name}
-                </SelectOption>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Plan filter */}
-          <Select value={filterPlan} onChange={setFilterPlan}>
-            <SelectTrigger className={filterSelectClass(!!filterPlan)}>
-              <Target className="w-4 h-4 shrink-0" />
-              <span className="truncate">{filterPlan ? plans?.find((p) => p.id === filterPlan)?.name ?? 'All' : 'Plan: All'}</span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectOption value=""><Target className="w-4 h-4" />All plans</SelectOption>
-              {(plans ?? []).map((p) => (
-                <SelectOption key={p.id} value={p.id}>
-                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color ?? '#6B7280' }} />
-                  {p.name}
-                </SelectOption>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Reset */}
-          {hasFilters && (
-            <button
-              onClick={clearFilters}
-              className="h-[50px] inline-flex items-center gap-2 px-3 rounded-[10px] text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <RotateCcw className="w-4 h-4 shrink-0" />
-              <span>Reset</span>
-            </button>
-          )}
-        </div>
-      </div>
+      <FilterBar
+        values={{ search, debouncedSearch, typeId: filterType, statusId: filterStatus, priorityId: filterPriority, assigneeId: filterAssignee, planId: filterPlan }}
+        onSearch={setSearch}
+        onClearSearch={() => { setSearch(''); setDebouncedSearch(''); searchRef.current?.focus(); }}
+        onChange={(patch) => {
+          if (patch.typeId !== undefined) setFilterType(patch.typeId);
+          if (patch.statusId !== undefined) setFilterStatus(patch.statusId);
+          if (patch.priorityId !== undefined) setFilterPriority(patch.priorityId);
+          if (patch.assigneeId !== undefined) setFilterAssignee(patch.assigneeId);
+          if (patch.planId !== undefined) setFilterPlan(patch.planId);
+        }}
+        data={{ types, statuses, priorities, members, plans }}
+        layout="grid"
+        searchRef={searchRef}
+        trailing={hasFilters ? (
+          <button
+            onClick={clearFilters}
+            className="h-[50px] inline-flex items-center gap-2 px-3 rounded-[10px] text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <RotateCcw className="w-4 h-4 shrink-0" />
+            <span>Reset</span>
+          </button>
+        ) : undefined}
+      />
 
       <div className="overflow-x-auto">
         {/* List header (desktop only) — sortable */}
@@ -572,13 +532,10 @@ export default function ProjectItemsPage() {
               >
                 {/* COL 1: Item info — clickable row link */}
                 <Link href={`/projects/${slug}/items/${item.sequenceNum}`} className="min-w-0 block">
-                  <div className="flex items-center gap-2 mb-1">
-                    {type && (
-                      <span className="inline-flex items-center gap-2 font-bold text-sm" style={{ color: type.color }}>
-                        <TypeIcon name={type.icon ?? null} className="w-4 h-4 shrink-0" />
-                        {type.name}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2 mb-1">
+                      {type && (
+                        <TypeBadge icon={type.icon} color={type.color} name={type.name} />
+                      )}
                     <span className="text-sm font-bold text-foreground truncate group-hover:text-primary transition-colors">
                       {item.title}
                     </span>
@@ -603,7 +560,7 @@ export default function ProjectItemsPage() {
                   )}
                   {plan && (
                     <div className="flex items-center gap-1.5 mt-1.5">
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: plan.color ?? '#6B7280' }} />
+                      <StatusDot color={plan.color ?? '#6B7280'} className="w-2 h-2" />
                       <span className="text-xs text-muted-foreground">{plan.name}</span>
                     </div>
                   )}
@@ -619,13 +576,13 @@ export default function ProjectItemsPage() {
                       onClose={() => setEdit(null)}
                     >
                       <SelectTrigger className="h-8 w-full rounded-[10px] border border-border bg-card text-sm font-bold text-foreground px-2.5">
-                        {status && <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: status.color }} />}
+                        {status && <StatusDot color={status.color} className="w-2 h-2" />}
                         {status?.name ?? 'Select'}
                       </SelectTrigger>
                       <SelectContent>
                         {(statuses ?? []).map((s) => (
                           <SelectOption key={s.id} value={s.id}>
-                            <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                            <StatusDot color={s.color} />
                             {s.name}
                           </SelectOption>
                         ))}
@@ -645,7 +602,7 @@ export default function ProjectItemsPage() {
                         color: 'var(--muted-foreground)',
                       }}
                     >
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: status?.color ?? '#7b8498' }} />
+                      <StatusDot color={status?.color} className="w-2 h-2" />
                       {status?.name ?? 'Set status'}
                     </button>
                   )}
@@ -661,13 +618,13 @@ export default function ProjectItemsPage() {
                       onClose={() => setEdit(null)}
                     >
                       <SelectTrigger className="h-8 w-full rounded-[10px] border border-border bg-card text-sm font-bold text-foreground px-2.5">
-                        {priority && <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: priority.color ?? '#888' }} />}
+                        {priority && <StatusDot color={priority.color ?? '#888'} className="w-2 h-2" />}
                         {priority?.name ?? 'Select'}
                       </SelectTrigger>
                       <SelectContent>
                         {(priorities ?? []).map((p) => (
                           <SelectOption key={p.id} value={p.id}>
-                            <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color ?? '#888' }} />
+                            <StatusDot color={p.color ?? '#888'} />
                             {p.name}
                           </SelectOption>
                         ))}
@@ -679,7 +636,7 @@ export default function ProjectItemsPage() {
                       className="h-8 inline-flex items-center gap-2 px-3 rounded-[10px] border border-border bg-card text-sm font-bold whitespace-nowrap transition-colors hover:bg-muted"
                       style={priority?.color ? { borderColor: `${priority.color}52`, color: priority.color } : undefined}
                     >
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: priority?.color ?? '#7b8498' }} />
+                      <StatusDot color={priority?.color} className="w-2 h-2" />
                       {priority?.name ?? 'Set priority'}
                     </button>
                   )}
@@ -688,33 +645,21 @@ export default function ProjectItemsPage() {
                 {/* COL 4: Assignee (inline edit) */}
                 <div className="relative">
                   {edit?.itemId === item.id && edit?.field === 'assigneeId' ? (
-                    <Select
+                    <AssigneePicker
                       value={item.assigneeId ?? ''}
+                      members={members}
                       onChange={(v) => handleUpdate(item.id, 'assigneeId', v || null)}
                       autoOpen
                       onClose={() => setEdit(null)}
-                    >
-                      <SelectTrigger className="h-8 w-full rounded-[10px] border border-border bg-card text-sm font-bold text-foreground px-2.5">
-                        {assignee ? <AvatarCircle name={assignee.name} /> : <User className="w-3.5 h-3.5 text-muted-foreground" />}
-                        {assignee?.name ?? 'Unassigned'}
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectOption value=""><User className="w-3.5 h-3.5" />Unassigned</SelectOption>
-                        {(members ?? []).map((m) => (
-                          <SelectOption key={m.userId} value={m.userId}>
-                            <AvatarCircle name={m.name} />
-                            {m.name}
-                          </SelectOption>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      triggerClassName="h-8 w-full rounded-[10px] border border-border bg-card text-sm font-bold text-foreground px-2.5"
+                    />
                   ) : (
                     <button
                       onClick={() => setEdit({ itemId: item.id, field: 'assigneeId' })}
                       className="h-8 inline-flex items-center gap-2.5 text-sm font-bold whitespace-nowrap transition-colors hover:text-foreground"
                     >
                       {assignee ? (
-                        <AvatarCircle name={assignee.name} />
+                        <AvatarCircle name={assignee.name} avatarUrl={assignee.avatarUrl} />
                       ) : (
                         <User className="w-5 h-5 text-muted-foreground" />
                       )}
@@ -734,7 +679,7 @@ export default function ProjectItemsPage() {
 
                 {/* COL 6: Delete */}
                 <button
-                  onClick={() => handleDeleteItem(item.id)}
+                  onClick={() => setDeleteTarget(item.id)}
                   className="w-9 h-9 rounded-lg grid place-items-center text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-colors"
                   aria-label="Delete item"
                 >
@@ -748,10 +693,7 @@ export default function ProjectItemsPage() {
                   <div className="px-4 py-3 space-y-2">
                     <div className="flex items-center gap-2">
                       {type && (
-                        <span className="text-xs font-bold inline-flex items-center gap-1" style={{ color: type.color }}>
-                          <TypeIcon name={type.icon ?? null} className="w-3 h-3" />
-                          {type.name}
-                        </span>
+                        <TypeBadge icon={type.icon} color={type.color} name={type.name} iconClassName="w-3 h-3" className="text-xs gap-1" />
                       )}
                       <span className="text-sm font-bold truncate text-foreground">{item.title}</span>
                     </div>
@@ -760,17 +702,17 @@ export default function ProjectItemsPage() {
                     )}
                     {plan && (
                       <div className="flex items-center gap-1.5">
-                        <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: plan.color ?? '#6B7280' }} />
+                        <StatusDot color={plan.color ?? '#6B7280'} className="w-1.5 h-1.5" />
                         <span className="text-xs text-muted-foreground">{plan.name}</span>
                       </div>
                     )}
                     <div className="flex items-center gap-2 text-xs">
                       <span className="inline-flex items-center gap-1 px-2 h-6 rounded border border-border" style={status?.color ? { borderColor: `${status.color}52`, color: status.color } : undefined}>
-                        <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: status?.color ?? '#7b8498' }} />
+                        <StatusDot color={status?.color} className="w-1.5 h-1.5" />
                         {status?.name ?? '—'}
                       </span>
                       <span style={priority?.color ? { color: priority.color } : undefined}>
-                        <div className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: priority?.color ?? '#7b8498' }} />
+                        <StatusDot color={priority?.color} className="w-1.5 h-1.5 inline-block" />
                         {' '}{priority?.name ?? '—'}
                       </span>
                       <span className="ml-auto text-muted-foreground">{new Date(item.createdAt).toLocaleDateString()}</span>
@@ -823,6 +765,20 @@ export default function ProjectItemsPage() {
       )}
 
       <QuickCreateModal open={quickCreateOpen} onClose={() => setQuickCreateOpen(false)} />
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title="Delete this item?"
+        message="This will permanently remove the item and its attachments."
+        confirmLabel="Delete"
+        onConfirm={() => deleteTarget && void handleDeleteItem(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+      />
+      <ImportItemsModal
+        slug={slug}
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={() => queryClient.invalidateQueries({ queryKey: ['items', slug] })}
+      />
     </div>
   );
 }

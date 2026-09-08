@@ -1,6 +1,7 @@
-import { Controller, Get, Patch, Body, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Patch, Body, Param, UseGuards, UseInterceptors, Req } from '@nestjs/common';
+import { EtagInterceptor } from '../../common/interceptors/etag.interceptor.js';
 import { Request } from 'express';
-import { JwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
+import { ApiKeyOrJwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
 import { getDb } from '../../database/client.js';
 import { items } from '../../database/schema/items.js';
 import { itemStatuses } from '../../database/schema/config.js';
@@ -11,7 +12,7 @@ import { ItemsService } from './items.service.js';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Controller('projects/:projectSlug/board')
-@UseGuards(JwtAuthGuard, ProjectMembershipGuard)
+@UseGuards(ApiKeyOrJwtAuthGuard, ProjectMembershipGuard)
 export class BoardController {
   constructor(
     private readonly itemsService: ItemsService,
@@ -19,6 +20,7 @@ export class BoardController {
   ) {}
 
   @Get()
+  @UseInterceptors(EtagInterceptor)
   async getBoard(@Req() req: Request) {
     const db = getDb();
     const projectId = req.projectId as string;

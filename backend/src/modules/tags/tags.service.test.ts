@@ -81,15 +81,18 @@ describe('TagsService', () => {
   it('should delete a tag', async () => {
     const tags = await tagsService.list(projectId);
     const tag = tags[0]!;
-    const result = await tagsService.delete(tag.id);
+    const result = await tagsService.delete(projectId, tag.id);
     expect(result).toEqual({ success: true });
 
     const remaining = await tagsService.list(projectId);
     expect(remaining.find((t) => t.id === tag.id)).toBeUndefined();
   });
 
-  it('should delete non-existent tag without error', async () => {
-    const result = await tagsService.delete(randomUUID());
-    expect(result).toEqual({ success: true });
+  it('should throw NotFound when deleting a tag from another project', async () => {
+    await expect(tagsService.delete(projectId, randomUUID())).rejects.toThrow('Tag not found');
+  });
+
+  it('should throw NotFound when updating a tag from another project', async () => {
+    await expect(tagsService.update(projectId, randomUUID(), { name: 'x' })).rejects.toThrow('Tag not found');
   });
 });

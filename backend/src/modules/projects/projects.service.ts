@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { getDb } from '../../database/client.js';
+import { getDb, type DbClient } from '../../database/client.js';
 import { projects } from '../../database/schema/projects.js';
 import { projectMembers } from '../../database/schema/members.js';
 import { itemTypes, itemStatuses, itemPriorities } from '../../database/schema/config.js';
@@ -24,29 +24,33 @@ export class ProjectsService {
 
     const projectId = randomUUID();
 
-    await db.insert(projects).values({
-      id: projectId,
-      name: data.name,
-      slug: data.slug,
-      description: data.description ?? null,
-      ownerId,
-    });
+    // All-or-nothing: project + membership + sequence + defaults.
+    await getDb().transaction(async (txx) => {
+      const tx = txx as unknown as DbClient;
+      await tx.insert(projects).values({
+        id: projectId,
+        name: data.name,
+        slug: data.slug,
+        description: data.description ?? null,
+        ownerId,
+      });
 
-    // Add owner as admin
-    await db.insert(projectMembers).values({
-      projectId,
-      userId: ownerId,
-      role: 'admin',
-    });
+      // Add owner as admin
+      await tx.insert(projectMembers).values({
+        projectId,
+        userId: ownerId,
+        role: 'admin',
+      });
 
-    // Create issue sequence
-    await db.insert(issueSequences).values({
-      projectId,
-      lastValue: 0,
-    });
+      // Create issue sequence
+      await tx.insert(issueSequences).values({
+        projectId,
+        lastValue: 0,
+      });
 
-    // Seed default configs
-    await this.seedDefaults(db, projectId);
+      // Seed default configs
+      await this.seedDefaults(tx, projectId);
+    });
 
     return this.getBySlug(data.slug);
   }
@@ -120,7 +124,7 @@ export class ProjectsService {
   }
 
   private async seedDefaults(
-    db: ReturnType<typeof getDb>,
+    db: DbClient,
     projectId: string,
   ) {
     // Default item types

@@ -19,7 +19,7 @@ cordlyx/
 │   ├── src/
 │   │   ├── modules/          # 19 feature modules
 │   │   ├── common/           # Guards (Jwt, Membership, Role, Admin), decorators, filters
-│   │   ├── database/         # Drizzle schema (21 tables), client, seed
+│   │   ├── database/         # Drizzle schema (27 tables), client, seed
 │   │   ├── queue/            # BullMQ activity queue + event listener
 │   │   ├── storage/          # StorageProvider interface + LocalStorageProvider
 │   │   ├── cache/            # Redis caching service
@@ -81,7 +81,7 @@ cordlyx/
 
 ---
 
-## 3. Database Schema (21 tables)
+## 3. Database Schema (27 tables)
 
 | Table | Description | Key Columns |
 |-------|-------------|-------------|
@@ -166,6 +166,10 @@ DELETE /api/v1/projects/:slug          # Soft-delete (admin)
 POST   /api/v1/projects/:slug/invites  # Create invite link (admin)
 GET    /api/v1/invites/:token          # Get invite info (JWT)
 POST   /api/v1/invites/:token/accept   # Accept invite → join project (JWT)
+GET    /api/v1/projects/:slug/snapshot/export  # Full snapshot JSON (config+plans+items+relations+roadmaps)
+POST   /api/v1/projects/:slug/snapshot/import  # Merge snapshot (multipart "file", query ?dedupe=&dryRun=, admin)
+POST   /api/v1/projects/snapshot/import-new    # New project from snapshot (query ?slug=&name=&dryRun=)
+Snapshot format is versioned (`version: 1`, see `snapshot-migration.ts`); unknown versions fail fast with supported list.
 ```
 
 ### Project Members
@@ -174,6 +178,20 @@ GET    /api/v1/projects/:slug/members           # List
 POST   /api/v1/projects/:slug/members           # Add by userId (admin)
 PATCH  /api/v1/projects/:slug/members/:id       # Change role (admin)
 DELETE /api/v1/projects/:slug/members/:id       # Remove (admin)
+```
+
+### Saved Views
+```
+GET    /api/v1/projects/:slug/views             # Mine + shared
+POST   /api/v1/projects/:slug/views             # Save (member; {name, filters, isShared?})
+PATCH  /api/v1/projects/:slug/views/:id         # Edit (owner or admin)
+DELETE /api/v1/projects/:slug/views/:id         # Delete (owner or admin)
+POST   /api/v1/projects/:slug/views/:id/set-default  # Project default (admin, unique)
+```
+
+### Project Stats
+```
+GET    /api/v1/projects/:slug/stats             # Overview: totals, byStatus/byType/byAssignee, overdue, doneRecently7d
 ```
 
 ### Project Config
@@ -192,12 +210,18 @@ GET    /api/v1/projects/:slug/priorities        # Priorities
 POST   /api/v1/projects/:slug/priorities        # Create (admin)
 PATCH  /api/v1/projects/:slug/priorities/:id    # Update (admin)
 DELETE /api/v1/projects/:slug/priorities/:id    # Delete (admin)
+
+GET    /api/v1/projects/:slug/config/export     # Config JSON template (types+statuses+priorities+tags)
+POST   /api/v1/projects/:slug/config/import     # Import template, upsert by name (multipart "file", ?dryRun=, admin)
 ```
 
 ### Items
 ```
-GET    /api/v1/projects/:slug/items             # List (cursor pagination, filters: type/status/priority/assignee/reporter/tag/plan/search/sort)
-GET    /api/v1/projects/:slug/items/export      # Export all as CSV (query: ?format=csv|json|jsonl)
+GET    /api/v1/projects/:slug/items             # List (cursor pagination, filters: type/status/priority/assignee/reporter/tag/plan/search/sort, ETag/304)
+GET    /api/v1/projects/:slug/items/sync            # Incremental sync (?since=ISO, deleted as stubs)
+GET    /api/v1/projects/:slug/items/export      # Export all as CSV (query: ?format=csv|json|jsonl, ETag)
+POST   /api/v1/projects/:slug/items/bulk        # Bulk create ≤100 (body {items[], dedupe?, dryRun?}, query overrides)
+POST   /api/v1/projects/:slug/items/import      # Import CSV/JSON/JSONL file (multipart field "file", query ?dedupe=&dryRun=)
 POST   /api/v1/projects/:slug/items             # Create
 GET    /api/v1/projects/:slug/items/:seq        # Get by sequence number
 POST   /api/v1/projects/:slug/items/check-duplicates  # Check duplicate titles
@@ -261,6 +285,9 @@ GET    /api/v1/projects/:slug/plans
 POST   /api/v1/projects/:slug/plans
 PATCH  /api/v1/projects/:slug/plans/:id
 DELETE /api/v1/projects/:slug/plans/:id
+GET    /api/v1/projects/:slug/plans/export      # Export as CSV (?format=csv|json|jsonl)
+POST   /api/v1/projects/:slug/plans/bulk        # Bulk create ≤100 (body {items[], dedupe?, dryRun?})
+POST   /api/v1/projects/:slug/plans/import      # Import CSV/JSON/JSONL file (multipart "file")
 ```
 
 ### Roadmaps
@@ -273,11 +300,15 @@ POST   /api/v1/projects/:slug/roadmaps                    # Create
 PATCH  /api/v1/projects/:slug/roadmaps/:id                 # Update
 DELETE /api/v1/projects/:slug/roadmaps/:id                 # Delete
 POST   /api/v1/projects/:slug/roadmaps/:id/lanes           # Create lane
+PATCH  /api/v1/projects/:slug/roadmaps/:id/lanes/reorder   # Atomic reorder ({laneIds[]})
 PATCH  /api/v1/projects/:slug/roadmaps/:id/lanes/:laneId   # Update lane
 DELETE /api/v1/projects/:slug/roadmaps/:id/lanes/:laneId   # Delete lane
 POST   /api/v1/projects/:slug/roadmaps/:id/schedule        # Schedule items
 DELETE /api/v1/projects/:slug/roadmaps/:id/items/:itemId   # Unschedule item
 PATCH  /api/v1/projects/:slug/roadmaps/:id/items/:itemId   # Update item dates/lane
+GET    /api/v1/projects/:slug/roadmaps/export              # Export all (lanes+schedule, ?format=json|csv)
+GET    /api/v1/projects/:slug/roadmaps/:id/export          # Export one roadmap as JSON
+POST   /api/v1/projects/:slug/roadmaps/import              # Import JSON/CSV file (multipart "file", ?dedupe=&dryRun=)
 ```
 
 ### Activity
@@ -298,14 +329,21 @@ GET    /api/v1/notifications/unread                        # Unread only
 GET    /api/v1/notifications/unread/count                  # Unread count
 PATCH  /api/v1/notifications/:id/read                      # Mark as read
 PATCH  /api/v1/notifications/read-all                      # Mark all as read
+GET    /api/v1/notifications/prefs                         # My per-project prefs
+PUT    /api/v1/notifications/prefs/:projectSlug            # Mute/digest/hour (self)
+POST   /api/v1/notifications/digest/send                   # One-off digest email (503 without SMTP)
+POST   /api/v1/notifications/digest/run-hour               # Hourly fan-out (server admin, ?hour=)
 ```
+Mute is enforced at creation (mention/assigned/reaction). Digest scheduling: repeatable `digest-hourly` queue job (hourly, UTC-hour fan-out), processed by both worker entrypoints via shared `digest-runner`.
 
 ### API Keys
 ```
-GET    /api/v1/api-keys                                    # List
-POST   /api/v1/api-keys                                    # Create
-DELETE /api/v1/api-keys/:id                                # Revoke
+GET    /api/v1/api-keys                                    # List (with lastUsedAt + rateLimitPerMin)
+POST   /api/v1/api-keys                                    # Create ({name, projectId?, expiresAt?, rateLimitPerMin? 1-10000})
+PATCH  /api/v1/api-keys/:id                                # Rename / change budget
+DELETE /api/v1/api-keys/:id                                # Revoke (immediate, validation cache invalidated)
 ```
+Rate limiting: global guard with per-key budgets (cached key validation, tracked by key id); JWT/IP share 60/min default.
 
 ### Admin
 ```
@@ -317,11 +355,14 @@ PATCH  /api/v1/admin/users/:id/deactivate                  # Deactivate user
 
 ### Webhooks
 ```
-GET    /api/v1/projects/:slug/webhooks                     # List (admin)
-POST   /api/v1/projects/:slug/webhooks                     # Create (admin)
+GET    /api/v1/projects/:slug/webhooks                     # List with lastDelivery (secrets never exposed, admin)
+POST   /api/v1/projects/:slug/webhooks                     # Create, returns signing secret once (url must be http(s), events validated)
+POST   /api/v1/projects/:slug/webhooks/:id/regenerate-secret  # Rotate secret
+GET    /api/v1/projects/:slug/webhooks/:id/deliveries      # Attempt log (?limit=, 30-day retention)
 PATCH  /api/v1/projects/:slug/webhooks/:id                 # Update (admin)
 DELETE /api/v1/projects/:slug/webhooks/:id                 # Delete (admin)
 ```
+Delivery: fire-and-forget from domain events (20 event types), HMAC-SHA256 (`X-Cordlyx-Signature`), 10s timeout, 3 attempts (0s/2s/8s backoff), per-attempt rows in `webhook_deliveries`.
 
 ### Health
 ```
@@ -463,12 +504,16 @@ interface StorageProvider {
 | Measure | Implementation |
 |---------|---------------|
 | Password hashing | bcrypt, cost factor 12 |
-| JWT access token | 15 min, signed with HS256 |
-| JWT refresh token | 7 days, rotation, localStorage + httpOnly cookie |
-| Rate limiting | Auth endpoints: 10 req/min, API: 60 req/min per IP |
-| RBAC | JwtGuard → ProjectMembershipGuard → ProjectRoleGuard (viewer/member/admin) |
+| JWT access token | 15 min, signed with HS256, `type: 'access'` claim |
+| JWT refresh token | 7 days, rotation, localStorage + httpOnly cookie, `type: 'refresh'` claim enforced (access tokens rejected, inactive users rejected) |
+| Logout | `POST /auth/logout` revokes the refresh token (jti denylist, expired rows purged opportunistically) |
+| Rate limiting | Auth endpoints: 10 req/min; API: 60 req/min per IP, per-key budgets (default 120, 1–10000) tracked by key id |
+| API keys | `clx_` prefix, SHA-256 hash only, 60s validation cache (revoke/update invalidate), optional project scope enforced in membership guard + quick-create |
+| RBAC | ApiKeyOrJwtGuard → ProjectMembershipGuard → ProjectRoleGuard (viewer/member/admin); class-level MinimumRole is inert — roles are per-method |
+| Project isolation | Every `:itemId`/`:id` mutation asserts project ownership (shared `assertItemInProject` + per-service checks); search scoped to member projects |
 | Admin access | AdminGuard checks ADMIN_EMAILS env variable |
-| Input validation | Zod schemas (shared with frontend) |
+| Input validation | Zod schemas (shared with frontend); cursors/limits validated (400, never 500) |
+| Webhooks | http(s)-only URLs, validated event names, HMAC-SHA256 signatures, secrets never listed |
 | SQL injection | Drizzle parameterized queries |
 | XSS | Next.js auto-escapes, Helmet (CSP disabled) |
 | File upload | Max 10 MB, MIME type + magic bytes validation |
@@ -498,26 +543,43 @@ Notes:
 
 ### CI/CD (GitHub Actions)
 
-`.github/workflows/ci.yml` — runs on push to main/master only (one run per
-release; docs-only changes ignored; superseded runs auto-cancelled):
-1. Spin up PostgreSQL + Redis (GitHub Actions services)
-2. `npm ci`
-3. `npm run build -w packages/shared`
-4. `npm run lint`
-5. Push schema to test DB
-6. `npm test` (341 unit/integration tests)
-7. `npm run build`
+`.github/workflows/ci.yml` — runs on push to main/master and on PRs
+(docs-only changes ignored; superseded runs auto-cancelled):
+1. `lint-and-test`: PostgreSQL + Redis services → `npm ci` → build shared →
+   `lint` → push `schema.sql` to test DB → `npm test` → `npm run build`
+2. `e2e` (needs `lint-and-test`): seeded stack (backend + frontend) →
+   Playwright UI specs + self-contained API contract spec →
+   generates Postman collection + curl cookbook (`api-clients` artifact)
+3. `backup` (needs `lint-and-test`): schema → seed → `pg_dump` →
+   `verify-restore.sh` into scratch DB → `migrate.sh` twice (upgrade +
+   idempotency, zero PENDING)
 
 `.github/workflows/deploy.yml` — runs after green CI on main/master
 (`workflow_run`) or manually (`workflow_dispatch` with `ref` for rollback):
-SSH to VPS → `git pull` → DB backup → `compose up -d --build` →
-`pg_isready` → `curl --fail :3005/health`. Concurrency group `production`,
+SSH to VPS → `git pull` → DB backup → **`scripts/migrate.sh` (stops deploy on failure)** →
+`compose up -d --build` → `pg_isready` → `curl --fail :3005/health`. Concurrency group `production`,
 Environment `production` (`SSH_HOST/SSH_USER/SSH_KEY`, optional
 `SSH_PORT`/`DEPLOY_PATH`). Branch flow: `feature/*` → `dev` → `main`.
 
+### DB migrations
+
+`scripts/migrate.sh` — versioned SQL from `backend/drizzle/migrations/`
+(`schema_migrations` table, one transaction per file, safe to re-run;
+`--list` shows pending). Files `0000–0005` are drizzle-kit legacy history
+(applied via push back then, never replayable — fresh installs use
+`backend/schema.sql`); managed files start at `0006` and must be idempotent.
+Existing DBs get legacy stamped, new files really applied; empty DBs are
+rejected with «load schema.sql first». Every run ends with a sanity check
+that all `schema.sql` tables exist. Connection: `DATABASE_URL` (TCP) or
+`docker compose exec` (`COMPOSE_FILE`, `PGDB` overrides for prod/testing).
+
 ### Backups
 
-`backup/backup.sh` — full DB + uploads backup with 14-day retention. Scheduled via systemd timer (`Persistent=true`) or cron fallback (see `backup/setup-cron.sh`).
+`backup/backup.sh` — full DB + uploads backup with 14-day retention. Scheduled via systemd timer (`Persistent=true`) or cron fallback (see `backup/setup-cron.sh`). Restore drill procedure: `RUNBOOK.md` §5 (`backup/verify-restore.sh` for scripted verification).
+
+### Runbook
+
+`RUNBOOK.md` — one-page incident guide: diagnosis table, DB/Redis/queue recovery, frontend `.next` fix, deploy rollback, restore from backup, migration troubleshooting, full-stack restart.
 
 ---
 
@@ -526,12 +588,22 @@ Environment `production` (`SSH_HOST/SSH_USER/SSH_KEY`, optional
 | Workspace | Files | Tests | Approach |
 |-----------|-------|-------|----------|
 | `packages/shared` | 1 | 34 | Zod schema validation (pure unit) |
-| `backend` | 39 | 268 | Integration (real DB, TRUNCATE per suite) + controller unit (mocked service) |
-| `frontend` | 8 | 39 | Unit (mocked API/Socket) + component (React Testing Library) |
-| `e2e` | 16 | ~62 | Playwright (full stack, seed data) |
-| **Total** | **64** | **~403** | |
+| `backend` | 58 | 389 | Integration (real DB, TRUNCATE per suite) + controller unit (mocked service) |
+| `frontend` | 11 | 51 | Unit (mocked API/Socket) + component (React Testing Library) |
+| `e2e` | 17 | ~65 | Playwright (full stack: UI specs on seed + self-contained API contract) |
+| **Total** | **87** | **~530** | |
 
 Backend tests use a separate `cordlyx_test` database (defined in `backend/.env.test`). Run `npm run test:db:push -w backend` to sync schema to test DB.
+
+### Load characteristics (local Docker, 2026-09, 2000-item probe)
+
+| Operation | Result |
+|-----------|--------|
+| Bulk create 2000 items (20×100) | 15.6 s total, ~130 items/s, p95 835 ms per 100 |
+| Items list (limit 50) | p50 3 ms, p95 10 ms |
+| Snapshot export (615 KB, 2000 items) | 27 ms |
+| Snapshot import-new (2000 items) | 12.5 s, 0 failed |
+| Activity queue under import load (4000+ events) | kept up (waiting: 0 right after import) |
 
 ---
 
@@ -540,15 +612,16 @@ Backend tests use a separate `cordlyx_test` database (defined in `backend/.env.t
 ### Implemented ✅
 
 1. Monorepo scaffold — workspaces, shared package, configs
-2. Database — 21 tables, Drizzle schema, seed data
+2. Database — 27 tables, Drizzle schema (+ manual search_vector), seed data
 3. Auth — register, login, JWT, refresh, change password
 4. Users — profile CRUD, search, account deletion
 5. Projects — CRUD + members + RBAC + soft-delete
 6. Item types, statuses, priorities — seed + project copy on create
-7. Items — CRUD + sequence numbering + cursor pagination + filters + export
+7. Items — CRUD + sequence numbering + cursor pagination + filters + export (csv/json/jsonl) + bulk create (≤100, dedupe title+type, dryRun) + file import (csv/json/jsonl, tag auto-create)
+   Multi-step writes are transactional (project create, item create, invite accept, lane reorder, schedule batch); snapshot import keeps partial-success semantics by design (per-row results) with orphan cleanup on import-new failure
 8. Comments — CRUD, threading, @mentions, emoji reactions
-9. Plans — CRUD (release/milestone/campaign/goal)
-10. Roadmaps — interactive Gantt editor with lanes, drag scheduling, dependency arrows
+9. Plans — CRUD (release/milestone/campaign/goal) + export (csv/json/jsonl) + bulk/import with name dedupe
+10. Roadmaps — interactive Gantt editor with lanes, drag scheduling, dependency arrows + export/import (lanes+schedule, items by sequence number)
 11. Board — Kanban with drag-and-drop (dnd-kit)
 12. Quick create — Cmd+K modal with duplicate detection
 13. Search — PostgreSQL tsvector + GIN index
@@ -557,19 +630,23 @@ Backend tests use a separate `cordlyx_test` database (defined in `backend/.env.t
 16. Relations — 6 types with cross-project guard
 17. Activity — async BullMQ logging (project + item level)
 18. Notifications — @mention + assigned, real-time WebSocket, dropdown + full page
-19. API Keys — clx_ prefix, SHA-256 hash, X-API-Key auth guard
+19. API Keys — clx_ prefix, SHA-256 hash, X-API-Key auth guard (all project endpoints accept JWT or API key; optional per-project scope enforced in ProjectMembershipGuard; admin/key-management stay JWT-only)
 20. Invite links — token-based, 7-day expiry, one-time use
 21. Webhooks — configurable per project, event-based HTTP callbacks
 22. Admin panel — user/project management, ADMIN_EMAILS guard
 23. WebSocket real-time updates — Socket.IO gateway
 24. Redis caching — membership (30 min), config (1 h)
-25. Health endpoint — GET /health DB check
+25. Health endpoint — GET /health returns { status: ok|degraded, checks: { postgres, redis, queue(waiting/active/failed/delayed, failedAboveThreshold>100) } }; HTTP 503 when degraded, excluded from Swagger and rate limiting
+26. OpenAPI docs — Swagger UI at /api/docs, JSON at /api/docs-json (@nestjs/swagger, jwt + api-key schemes)
+27. Project snapshots — full export/import (config+plans+items+relations+roadmaps, seq remap, merge or new project) + Settings → Data hub UI
+28. Overview dashboard (stats aggregation) + server-side shared/default views + email digests/mute + ETag/sync
 26. Dark mode — next-themes
 27. Keyboard shortcuts — Cmd+K, /, ?, Escape
 28. 404/error pages — custom not-found.tsx and error.tsx
 29. nginx reverse proxy — production Docker setup
-30. CI pipeline — GitHub Actions (lint → test → build)
-31. Backup system — pg_dump + uploads, systemd/cron scheduling
+30. CI pipeline — GitHub Actions (lint → test → build on PRs and main; e2e job with seeded stack: UI specs + API contract spec; backup job: dump + verify-restore into scratch DB)
+31. Backup system — pg_dump + uploads, systemd/cron scheduling, restore verified in CI (`backup/verify-restore.sh` into scratch DB)
+32. Queue observability — worker logs completed/failed with duration; enqueue failures warn without breaking requests; 5xx/429 logged by exception filter
 
 ### Missing / Not Yet Implemented
 
@@ -581,7 +658,6 @@ Backend tests use a separate `cordlyx_test` database (defined in `backend/.env.t
 - Time tracking (log start/stop)
 - Email notifications
 - Custom roles (beyond viewer/member/admin)
-- Data import
 - Server-side rendering (all pages are 'use client')
 
 ---

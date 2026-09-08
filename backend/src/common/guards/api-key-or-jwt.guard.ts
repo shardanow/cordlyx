@@ -23,6 +23,8 @@ export class ApiKeyOrJwtAuthGuard extends AuthGuard('jwt') {
       request.user = user;
       // If key is scoped to a project, enforce it
       if (user.projectId) request.apiKeyProjectId = user.projectId;
+      request.apiKeyId = user.keyId;
+      request.apiKeyRateLimit = user.rateLimitPerMin;
       return true;
     }
 

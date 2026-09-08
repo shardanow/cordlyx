@@ -15,6 +15,7 @@ describe('CommentsService', () => {
   let commentsService: CommentsService;
   let userId: string;
   let itemId: string;
+  let projectId: string;
 
   beforeAll(async () => {
     commentsService = new CommentsService({ getByCommentIds: async () => [] } as any);
@@ -29,7 +30,7 @@ describe('CommentsService', () => {
       name: 'Comments Test',
     });
 
-    const projectId = randomUUID();
+    projectId = randomUUID();
     await db.insert(projects).values({
       id: projectId,
       name: 'Comments Test Project',
@@ -107,14 +108,14 @@ describe('CommentsService', () => {
   it('should update comment body', async () => {
     const comments = await commentsService.getByItem(itemId);
     const comment = comments[0]!;
-    const updated = await commentsService.update(comment.id, 'Updated body');
+    const updated = await commentsService.update(projectId, itemId, comment.id, 'Updated body');
     expect(updated!.body).toBe('Updated body');
   });
 
   it('should soft delete comment', async () => {
     const comments = await commentsService.getByItem(itemId);
     const comment = comments[0]!;
-    const result = await commentsService.softDelete(comment.id);
+    const result = await commentsService.softDelete(projectId, itemId, comment.id);
     expect(result).toEqual({ success: true });
 
     const remaining = await commentsService.getByItem(itemId);
@@ -123,17 +124,18 @@ describe('CommentsService', () => {
 
   it('should be idempotent on soft-deleting already deleted comment', async () => {
     const fresh = await commentsService.create(itemId, userId, 'Idempotent test');
-    const result = await commentsService.softDelete(fresh!.id);
+    const result = await commentsService.softDelete(projectId, itemId, fresh!.id);
     expect(result).toEqual({ success: true });
 
     // Second delete should also succeed (not throw)
-    const result2 = await commentsService.softDelete(fresh!.id);
+    const result2 = await commentsService.softDelete(projectId, itemId, fresh!.id);
     expect(result2).toEqual({ success: true });
   });
 
-  it('should return undefined when updating non-existent comment', async () => {
-    const result = await commentsService.update(randomUUID(), 'Any body');
-    expect(result).toBeUndefined();
+  it('should throw NotFound when updating non-existent comment', async () => {
+    await expect(commentsService.update(projectId, itemId, randomUUID(), 'Any body')).rejects.toThrow(
+      'Comment not found',
+    );
   });
 
   it('should exclude soft-deleted comments from listing', async () => {
@@ -144,7 +146,7 @@ describe('CommentsService', () => {
     const before = await commentsService.getByItem(itemId);
     expect(before.some((c) => c.id === fresh!.id)).toBe(true);
 
-    await commentsService.softDelete(fresh!.id);
+    await commentsService.softDelete(projectId, itemId, fresh!.id);
 
     const after = await commentsService.getByItem(itemId);
     expect(after.some((c) => c.id === fresh!.id)).toBe(false);

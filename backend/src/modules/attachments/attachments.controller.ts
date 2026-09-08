@@ -9,14 +9,17 @@ import {
   Req,
   UseInterceptors,
 } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Request } from 'express';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { JwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
+import { ApiKeyOrJwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
+import { assertItemInProject } from '../../common/assert-item.js';
 import { AttachmentsService } from './attachments.service.js';
 
+@ApiTags('attachments')
 @Controller('projects/:projectSlug/items/:itemId/attachments')
-@UseGuards(JwtAuthGuard, ProjectMembershipGuard)
+@UseGuards(ApiKeyOrJwtAuthGuard, ProjectMembershipGuard)
 export class AttachmentsController {
   constructor(
     private readonly attachmentsService: AttachmentsService,
@@ -24,7 +27,8 @@ export class AttachmentsController {
   ) {}
 
   @Get()
-  async list(@Param('itemId') itemId: string) {
+  async list(@Req() req: Request, @Param('itemId') itemId: string) {
+    await assertItemInProject(req.projectId as string, itemId);
     return this.attachmentsService.getByItem(itemId);
   }
 
@@ -38,6 +42,7 @@ export class AttachmentsController {
     @CurrentUser() user: AuthenticatedUser,
     @UploadedFile() file: Express.Multer.File,
   ) {
+    await assertItemInProject(req.projectId as string, itemId);
     const attachment = await this.attachmentsService.upload(itemId, user.id, file);
     this.eventEmitter.emit('attachment.created', {
       projectId: req.projectId,
@@ -57,6 +62,7 @@ export class AttachmentsController {
     @Req() req: Request,
     @CurrentUser() user: AuthenticatedUser,
   ) {
+    await assertItemInProject(req.projectId as string, itemId);
     const result = await this.attachmentsService.delete(id, itemId);
     this.eventEmitter.emit('attachment.deleted', {
       projectId: req.projectId,

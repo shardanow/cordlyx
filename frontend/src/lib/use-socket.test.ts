@@ -20,6 +20,11 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => mockQueryClient,
 }));
 
+vi.mock('@/stores/auth-store', () => ({
+  useAuthStore: (selector: (s: any) => unknown) =>
+    selector({ user: { id: 'u-1', name: 'Alice' } }),
+}));
+
 const { useSocket } = await import('./use-socket');
 
 describe('useSocket', () => {
@@ -39,9 +44,9 @@ describe('useSocket', () => {
     );
   });
 
-  it('should join project room when projectId is provided', () => {
+  it('should join project room with the server protocol', () => {
     renderHook(() => useSocket('proj-1'));
-    expect(mockEmit).toHaveBeenCalledWith('join:project', 'proj-1');
+    expect(mockEmit).toHaveBeenCalledWith('join', { projectId: 'proj-1', userId: 'u-1' });
   });
 
   it('should not join when projectId is null', () => {
@@ -59,14 +64,15 @@ describe('useSocket', () => {
     expect(mockOn).toHaveBeenCalledWith('comment:deleted', expect.any(Function));
   });
 
-  it('should invalidate queries on item event', () => {
+  it('should invalidate item-related queries on item event', () => {
     renderHook(() => useSocket('proj-1'));
 
     // Find the handler for item:created and call it
     const createdHandler = mockOn.mock.calls.find((c) => c[0] === 'item:created')![1];
     createdHandler();
-    expect(mockQueryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['items'] });
-    expect(mockQueryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['board'] });
+    for (const key of [['items'], ['item'], ['board'], ['stats'], ['activity'], ['item-activity']]) {
+      expect(mockQueryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: key });
+    }
   });
 
   it('should invalidate queries on comment event', () => {
@@ -80,7 +86,7 @@ describe('useSocket', () => {
   it('should leave project room on unmount when projectId provided', () => {
     const { unmount } = renderHook(() => useSocket('proj-1'));
     unmount();
-    expect(mockEmit).toHaveBeenCalledWith('leave:project', 'proj-1');
+    expect(mockEmit).toHaveBeenCalledWith('leave', { projectId: 'proj-1' });
   });
 
   it('should not leave project room on unmount when no projectId', () => {

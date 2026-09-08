@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { LoggerModule } from 'nestjs-pino';
+import { ApiKeyThrottlerGuard, apiKeyLimit, apiKeyTracker } from './common/guards/api-key-throttler.guard.js';
 import { configModule } from './config/index.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { UsersModule } from './modules/users/users.module.js';
@@ -37,7 +38,12 @@ import { HealthController } from './health.controller.js';
       },
     }),
     ThrottlerModule.forRoot([
-      { name: 'default', ttl: 60000, limit: 60 },
+      {
+        name: 'default',
+        ttl: 60000,
+        limit: apiKeyLimit,
+        getTracker: apiKeyTracker,
+      },
     ]),
     EventEmitterModule.forRoot({ wildcard: true, delimiter: '.' }),
     QueueModule,
@@ -65,7 +71,7 @@ import { HealthController } from './health.controller.js';
   providers: [
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: ApiKeyThrottlerGuard,
     },
   ],
 })

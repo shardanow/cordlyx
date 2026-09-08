@@ -1,10 +1,14 @@
 name: CI
 
-# Cost-saving: full suite runs ONLY on push to main/master (post-merge).
-# One run per release gates the Deploy workflow; PRs and dev carry no
-# checks. Run `npm test` locally before opening a PR to main.
+# Full suite runs on push to main/master (post-merge) and on every PR.
+# One run per release gates the Deploy workflow.
 on:
   push:
+    branches: [main, master]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  pull_request:
     branches: [main, master]
     paths-ignore:
       - '**.md'
@@ -75,3 +79,158 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: cordlyx
+          POSTGRES_PASSWORD: cordlyx
+          POSTGRES_DB: cordlyx
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://cordlyx:cordlyx@localhost:5432/cordlyx
+      REDIS_URL: redis://localhost:6379/0
+      JWT_SECRET: ci-e2e-secret
+      PORT: 4000
+      NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - run: npm ci
+
+      - run: npm run build -w packages/shared
+
+      - name: Push schema
+        run: psql "$DATABASE_URL" < backend/schema.sql
+
+      - name: Build backend
+        run: npm run build -w backend
+
+      - name: Seed demo data (for UI specs)
+        run: |
+          find backend/dist -name "*.js" -exec sed -i 's/require("\(.*\)\.ts")/require("\1.js")/g' {} \; 2>/dev/null || true
+          node backend/dist/src/database/seed.js
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Start backend
+        run: |
+          node backend/dist/src/main > /tmp/backend.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:4000/health && break
+            sleep 2
+          done
+          curl -sf http://localhost:4000/health
+
+      - name: Start frontend
+        run: |
+          npm run build -w frontend
+          (npm run start -w frontend -- -p 3000 > /tmp/frontend.log 2>&1 &)
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:3000/login && break
+            sleep 3
+          done
+          curl -sf http://localhost:3000/login
+
+      - name: Generate Postman collection + curl cookbook
+        run: |
+          curl -sf http://localhost:4000/api/docs-json -o /tmp/openapi.json
+          node scripts/openapi-to-postman.mjs /tmp/openapi.json postman/
+
+      - name: Upload API artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-clients
+          path: postman/
+
+      - name: Run Playwright (UI + API contract)
+        run: npx playwright test
+
+      - name: Dump backend log on failure
+        if: failure()
+        run: tail -100 /tmp/backend.log
+
+  backup:
+    runs-on: ubuntu-latest
+    needs: lint-and-test
+
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: cordlyx
+          POSTGRES_PASSWORD: cordlyx
+          POSTGRES_DB: cordlyx
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://cordlyx:cordlyx@localhost:5432/cordlyx
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - run: npm ci
+
+      - run: npm run build -w packages/shared
+
+      - name: Push schema
+        run: psql "$DATABASE_URL" < backend/schema.sql
+
+      - name: Build backend
+        run: npm run build -w backend
+
+      - name: Seed demo data
+        run: |
+          find backend/dist -name "*.js" -exec sed -i 's/require("\(.*\)\.ts")/require("\1.js")/g' {} \; 2>/dev/null || true
+          node backend/dist/src/database/seed.js
+
+      - name: Dump + verify restore
+        run: |
+          pg_dump "$DATABASE_URL" --clean --if-exists > /tmp/dump.sql
+          EXPECT_SEEDED=1 bash backup/verify-restore.sh /tmp/dump.sql
+
+      - name: Migrate twice (upgrade path + idempotency)
+        run: |
+          ./scripts/migrate.sh
+          ./scripts/migrate.sh
+          test "$(./scripts/migrate.sh --list | grep -c 'PENDING' || true)" = "0"

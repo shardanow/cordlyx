@@ -114,10 +114,17 @@ describe('RelationsService', () => {
   it('should delete a relation', async () => {
     const result = await relationsService.getByItem(itemAId);
     const rel = result.outgoing[0]!;
-    const deleteResult = await relationsService.delete(rel.id);
+    const deleteResult = await relationsService.delete(rel.id, projectId);
     expect(deleteResult).toEqual({ success: true });
 
     const after = await relationsService.getByItem(itemAId);
     expect(after.outgoing.find((r) => r.id === rel.id)).toBeUndefined();
+  });
+
+  it('should throw NotFound when deleting a relation from another project', async () => {
+    const rel = await relationsService.create(itemAId, itemBId, 'depends_on', projectId);
+    await expect(relationsService.delete(rel!.id, randomUUID())).rejects.toThrow('Relation not found');
+    // cleanup with correct project
+    await relationsService.delete(rel!.id, projectId);
   });
 });

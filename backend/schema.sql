@@ -209,6 +209,7 @@ CREATE TABLE api_keys (
   key_prefix character varying(12) NOT NULL,
   expires_at timestamp,
   last_used_at timestamp,
+  rate_limit_per_min integer DEFAULT 120 NOT NULL,
   created_at timestamp DEFAULT now() NOT NULL,
   CONSTRAINT api_keys_key_hash_unique UNIQUE (key_hash),
   CONSTRAINT api_keys_pkey PRIMARY KEY (id)
@@ -304,10 +305,25 @@ CREATE TABLE webhooks (
   url character varying(2048) NOT NULL,
   events jsonb NOT NULL,
   is_active boolean DEFAULT true NOT NULL,
+  secret character varying(64),
   created_at timestamp DEFAULT now() NOT NULL,
   updated_at timestamp DEFAULT now() NOT NULL,
   CONSTRAINT webhooks_pkey PRIMARY KEY (id)
 );
+
+CREATE TABLE webhook_deliveries (
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  webhook_id uuid NOT NULL,
+  event character varying(100) NOT NULL,
+  http_status integer,
+  success boolean DEFAULT false NOT NULL,
+  error_message text,
+  duration_ms integer,
+  attempt integer DEFAULT 1 NOT NULL,
+  created_at timestamp DEFAULT now() NOT NULL,
+  CONSTRAINT webhook_deliveries_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_webhook_deliveries_webhook_created ON webhook_deliveries (webhook_id, created_at);
 
 -- Foreign keys
 
@@ -358,6 +374,45 @@ ALTER TABLE roadmap_items ADD CONSTRAINT roadmap_items_lane_id_roadmap_lanes_id_
 ALTER TABLE invites ADD CONSTRAINT invites_project_id_projects_id_fk FOREIGN KEY (project_id) REFERENCES projects(id);
 ALTER TABLE invites ADD CONSTRAINT invites_created_by_id_users_id_fk FOREIGN KEY (created_by_id) REFERENCES users(id);
 ALTER TABLE webhooks ADD CONSTRAINT webhooks_project_id_projects_id_fk FOREIGN KEY (project_id) REFERENCES projects(id);
+ALTER TABLE webhook_deliveries ADD CONSTRAINT webhook_deliveries_webhook_id_webhooks_id_fk FOREIGN KEY (webhook_id) REFERENCES webhooks(id) ON DELETE CASCADE;
+
+CREATE TABLE project_views (
+  id uuid DEFAULT gen_random_uuid() NOT NULL,
+  project_id uuid NOT NULL,
+  owner_id uuid NOT NULL,
+  name character varying(100) NOT NULL,
+  filters jsonb NOT NULL,
+  is_shared boolean DEFAULT false NOT NULL,
+  is_default boolean DEFAULT false NOT NULL,
+  created_at timestamp DEFAULT now() NOT NULL,
+  updated_at timestamp DEFAULT now() NOT NULL,
+  CONSTRAINT project_views_pkey PRIMARY KEY (id)
+);
+CREATE INDEX idx_project_views_project ON project_views (project_id, created_at);
+ALTER TABLE project_views ADD CONSTRAINT project_views_project_id_projects_id_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE;
+ALTER TABLE project_views ADD CONSTRAINT project_views_owner_id_users_id_fk FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE;
+
+CREATE TABLE notification_prefs (
+  user_id uuid NOT NULL,
+  project_id uuid NOT NULL,
+  muted boolean DEFAULT false NOT NULL,
+  email_digest boolean DEFAULT false NOT NULL,
+  digest_hour integer DEFAULT 8 NOT NULL,
+  updated_at timestamp DEFAULT now() NOT NULL,
+  CONSTRAINT notification_prefs_user_id_project_id_unique UNIQUE (user_id, project_id)
+);
+ALTER TABLE notification_prefs ADD CONSTRAINT notification_prefs_user_id_users_id_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE notification_prefs ADD CONSTRAINT notification_prefs_project_id_projects_id_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE;
+
+CREATE TABLE revoked_refresh_tokens (
+  jti character varying(64) NOT NULL,
+  user_id uuid NOT NULL,
+  expires_at timestamp NOT NULL,
+  created_at timestamp DEFAULT now() NOT NULL,
+  CONSTRAINT revoked_refresh_tokens_pkey PRIMARY KEY (jti)
+);
+CREATE INDEX idx_revoked_refresh_tokens_user ON revoked_refresh_tokens (user_id);
+ALTER TABLE revoked_refresh_tokens ADD CONSTRAINT revoked_refresh_tokens_user_id_users_id_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
 
 -- Indexes
 

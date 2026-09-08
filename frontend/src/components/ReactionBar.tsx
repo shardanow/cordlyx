@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Plus } from 'lucide-react';
+import { AvatarCircle } from '@/components/features/AvatarCircle';
 
 interface ReactionGroup {
   count: number;
@@ -50,6 +51,13 @@ export default function ReactionBar({ reactions, currentUserId, onToggle, onAdd 
             title={data.users.map((u) => u.name).join(', ')}
           >
             <span className="text-sm leading-none">{emoji}</span>
+            <span className="flex items-center">
+              {data.users.slice(0, 3).map((u, i) => (
+                <span key={u.id} className={i > 0 ? '-ml-1.5 ring-2 ring-card rounded-full' : ''}>
+                  <AvatarCircle name={u.name} avatarUrl={u.avatarUrl} size="xs" className="w-4 h-4 text-[8px]" />
+                </span>
+              ))}
+            </span>
             <span>{data.count}</span>
           </button>
         );

@@ -10,11 +10,12 @@ import QuickCreateModal from '@/components/QuickCreateModal';
 import SearchModal from '@/components/SearchModal';
 import ShortcutsModal from '@/components/ShortcutsModal';
 import NotificationsButton from '@/components/NotificationsButton';
+import { Avatar } from '@/components/ui/avatar';
 import { useTheme } from 'next-themes';
 import {
   FolderOpen, Search, Keyboard, Sun, Moon,
   LogOut, Plus, ChevronLeft, Menu, X,
-  LayoutList, Columns3, Activity, Users, Settings, Target, Map, Shield,
+  LayoutList, Columns3, Activity, Users, Settings, Target, Map, Shield, LayoutDashboard,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import NextTopLoader from 'nextjs-toploader';
@@ -130,6 +131,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const mainNav: NavItem[] = [
     { href: '/projects', label: 'Projects', icon: FolderOpen },
     ...(projectSlug ? [
+      { href: `/projects/${projectSlug}/dashboard`, label: 'Overview', icon: LayoutDashboard },
       { href: `/projects/${projectSlug}`, label: 'Items List', icon: LayoutList },
       { href: `/projects/${projectSlug}/board`, label: 'Board', icon: Columns3 },
       { href: `/projects/${projectSlug}/plans`, label: 'Plans', icon: Target },
@@ -348,11 +350,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
           >
             <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium shrink-0 overflow-hidden">
-              {user.avatarUrl ? (
-                <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
-              ) : (
-                user.name.charAt(0).toUpperCase()
-              )}
+              <Avatar src={user.avatarUrl} name={user.name} size="md" />
             </div>
             <div className={cn('flex-1 min-w-0', !sidebarOpen && 'hidden')}>
               <p className="text-sm font-semibold truncate">{user.name}</p>
