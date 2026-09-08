@@ -11,12 +11,14 @@ import { ApiKeysService } from '../../modules/api-keys/api-keys.service.js';
 
 /**
  * Requests/min budget: the key's own limit when resolved, else the default.
- * Overridable via THROTTLE_LIMIT (load testing / e2e headroom); prod default 60.
+ * Overridable via THROTTLE_LIMIT (load testing / e2e headroom); prod default 120.
+ * (120 fits SPA prefetch bursts: ~12 requests per navigation. Auth brute-force
+ * protection lives in the isolated 'auth' bucket and is unaffected.)
  */
 export function apiKeyLimit(context: ExecutionContext): number {
   const override = Number.parseInt(process.env.THROTTLE_LIMIT ?? '', 10);
   if (Number.isFinite(override) && override > 0) return override;
-  return context.switchToHttp().getRequest().apiKeyRateLimit ?? 60;
+  return context.switchToHttp().getRequest().apiKeyRateLimit ?? 120;
 }
 
 /**

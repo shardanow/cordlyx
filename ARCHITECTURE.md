@@ -126,7 +126,7 @@ cordlyx/
 ## 4. Guards Chain
 
 ```
-ThrottlerGuard (global, 60 req/min, isolated auth bucket 10 req/min on login/register)
+ThrottlerGuard (global, 120 req/min, isolated auth bucket 10 req/min on login/register)
   └─ JwtAuthGuard (validates Bearer JWT, sets request.user)
        └─ ApiKeyOrJwtAuthGuard (accepts JWT or X-API-Key header)
        └─ AdminGuard (checks email against ADMIN_EMAILS env)
@@ -343,7 +343,7 @@ POST   /api/v1/api-keys                                    # Create ({name, proj
 PATCH  /api/v1/api-keys/:id                                # Rename / change budget
 DELETE /api/v1/api-keys/:id                                # Revoke (immediate, validation cache invalidated)
 ```
-Rate limiting: global guard with per-key budgets (cached key validation, tracked by key id); JWT/IP share 60/min default.
+Rate limiting: global guard with per-key budgets (cached key validation, tracked by key id); JWT/IP share 120/min default.
 
 ### Admin
 ```
@@ -507,7 +507,7 @@ interface StorageProvider {
 | JWT access token | 15 min, signed with HS256, `type: 'access'` claim |
 | JWT refresh token | 7 days, rotation, localStorage + httpOnly cookie, `type: 'refresh'` claim enforced (access tokens rejected, inactive users rejected) |
 | Logout | `POST /auth/logout` revokes the refresh token (jti denylist, expired rows purged opportunistically) |
-| Rate limiting | Auth endpoints: 10 req/min; API: 60 req/min per IP, per-key budgets (default 120, 1–10000) tracked by key id |
+| Rate limiting | Auth endpoints: 10 req/min; API: 120 req/min per IP, per-key budgets (default 120, 1–10000) tracked by key id |
 | API keys | `clx_` prefix, SHA-256 hash only, 60s validation cache (revoke/update invalidate), optional project scope enforced in membership guard + quick-create |
 | RBAC | ApiKeyOrJwtGuard → ProjectMembershipGuard → ProjectRoleGuard (viewer/member/admin); class-level MinimumRole is inert — roles are per-method |
 | Project isolation | Every `:itemId`/`:id` mutation asserts project ownership (shared `assertItemInProject` + per-service checks); search scoped to member projects |

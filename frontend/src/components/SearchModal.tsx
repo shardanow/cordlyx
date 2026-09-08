@@ -40,7 +40,8 @@ export default function SearchModal({
 
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    if (!query.trim()) {
+    // Skip tiny queries: they match everything and only burn rate-limit budget.
+    if (query.trim().length < 2) {
       setResults([]);
       return;
     }
@@ -55,7 +56,7 @@ export default function SearchModal({
       } finally {
         setLoading(false);
       }
-    }, 200);
+    }, 350);
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [query]);
 

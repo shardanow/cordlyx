@@ -11,7 +11,18 @@ describe('apiKeyLimit', () => {
   });
 
   it('falls back to the default budget', () => {
-    expect(apiKeyLimit(ctx({}))).toBe(60);
+    expect(apiKeyLimit(ctx({}))).toBe(120);
+  });
+
+  it('honors the THROTTLE_LIMIT override', () => {
+    const prev = process.env.THROTTLE_LIMIT;
+    process.env.THROTTLE_LIMIT = '1000';
+    try {
+      expect(apiKeyLimit(ctx({ apiKeyRateLimit: 5 }))).toBe(1000);
+    } finally {
+      if (prev === undefined) delete process.env.THROTTLE_LIMIT;
+      else process.env.THROTTLE_LIMIT = prev;
+    }
   });
 });
 
@@ -26,6 +37,11 @@ describe('apiKeyTracker', () => {
 
   it('prefers first forwarded ip', () => {
     expect(apiKeyTracker({ ips: ['9.9.9.9', '1.2.3.4'], ip: '1.2.3.4' })).toBe('9.9.9.9');
+  });
+
+  it('uses the client ip behind a proxy, not the proxy ip', () => {
+    // Requires Express 'trust proxy' so req.ips is populated from X-Forwarded-For.
+    expect(apiKeyTracker({ ips: ['203.0.113.7'], ip: '172.18.0.5' })).toBe('203.0.113.7');
   });
 });
 

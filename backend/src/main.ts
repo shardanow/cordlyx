@@ -39,6 +39,13 @@ async function bootstrap() {
   app.useGlobalFilters(new AllExceptionsFilter());
   app.setGlobalPrefix('api/v1', { exclude: [{ path: 'health', method: 0 }] });
 
+  // Trust the first proxy hop (nginx in docker / VPS). Required so Express
+  // parses X-Forwarded-For: without it req.ips is empty and rate limiting
+  // (plus logging) sees every client as the proxy's own IP — one shared bucket.
+  // Spoofing is not possible: Express takes the address before the trusted hop,
+  // and nginx appends the real client IP. Direct (no-proxy) dev traffic is unaffected.
+  app.set('trust proxy', 1);
+
   // OpenAPI docs (Swagger UI at /api/docs, raw JSON at /api/docs-json).
   // Served directly on the HTTP adapter, so the global api/v1 prefix does not apply.
   const swaggerConfig = new DocumentBuilder()
