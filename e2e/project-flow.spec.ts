@@ -11,9 +11,9 @@ test.describe('Project flow', () => {
     await expect(page).toHaveURL('/projects', { timeout: 10000 });
 
     // Create a new project
-    await page.getByRole('button', { name: /new project/i }).click();
-    await page.getByPlaceholder(/name/i).fill('E2E Test Project');
-    await page.getByRole('button', { name: /create/i }).click();
+    await page.getByRole('button', { name: /create project/i }).first().click();
+    await page.getByPlaceholder('Project name').fill('E2E Test Project');
+    await page.locator('form').getByRole('button', { name: 'Create project' }).click();
     await expect(page.getByText('E2E Test Project')).toBeVisible({ timeout: 5000 });
 
     // Navigate to board
@@ -33,9 +33,9 @@ test.describe('Project flow', () => {
     await expect(page).toHaveURL('/projects', { timeout: 10000 });
 
     // Create project for test
-    await page.getByRole('button', { name: /new project/i }).click();
-    await page.getByPlaceholder(/name/i).fill('Settings Test');
-    await page.getByRole('button', { name: /create/i }).click();
+    await page.getByRole('button', { name: /create project/i }).first().click();
+    await page.getByPlaceholder('Project name').fill('Settings Test');
+    await page.locator('form').getByRole('button', { name: 'Create project' }).click();
     await page.waitForTimeout(1000);
 
     // Go to Settings tab
@@ -65,7 +65,7 @@ test.describe('Project flow', () => {
     await expect(page).toHaveURL(/\/activity$/);
     // Should either show items or empty state
     await page.waitForTimeout(1000);
-    const emptyState = page.getByText('No activity yet.');
+    const emptyState = page.getByText('No activity found.');
     const activityItems = page.locator('text=/created|updated|deleted|changed|added|removed/i');
     // At least one of them should be present
     await expect(emptyState.or(activityItems.first())).toBeVisible({ timeout: 3000 });
@@ -85,9 +85,9 @@ test.describe('Project flow', () => {
     // Go to Members tab
     await page.getByRole('link', { name: /members/i }).click();
     await expect(page).toHaveURL(/\/members$/);
-    // Alice should be listed as admin
-    await expect(page.getByText('alice@example.com')).toBeVisible({ timeout: 5000 });
+    // Alice should be listed as admin (sidebar also shows her email — take the first)
+    await expect(page.getByText('alice@example.com').first()).toBeVisible({ timeout: 5000 });
     // Admin role badge or text should be visible
-    await expect(page.getByText(/admin/i)).toBeVisible();
+    await expect(page.getByText(/admin/i).first()).toBeVisible();
   });
 });

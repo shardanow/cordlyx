@@ -31,8 +31,8 @@ test.describe('Roadmaps', () => {
     await page.getByRole('link', { name: /roadmaps/i }).click();
     await expect(page).toHaveURL(/\/roadmaps$/);
 
-    await page.getByRole('button', { name: /create roadmap/i }).click();
-    await page.getByPlaceholder(/name/i).fill('Q3 Release');
+    await page.getByRole('button', { name: /create roadmap/i }).first().click();
+    await page.getByPlaceholder('Q3 2024 Release').fill('Q3 Release');
     await page.locator('input[type="date"]').first().fill(TOMORROW);
     await page.locator('input[type="date"]').nth(1).fill(NEXT_WEEK);
     await page.getByRole('button', { name: /^Create$/ }).click();
@@ -53,17 +53,17 @@ test.describe('Roadmaps', () => {
     await expect(page).toHaveURL(/\/roadmaps$/);
 
     // Create
-    await page.getByRole('button', { name: /create roadmap/i }).click();
-    await page.getByPlaceholder(/name/i).fill('Edit Roadmap');
+    await page.getByRole('button', { name: /create roadmap/i }).first().click();
+    await page.getByPlaceholder('Q3 2024 Release').fill('Edit Roadmap');
     await page.locator('input[type="date"]').first().fill(TOMORROW);
     await page.locator('input[type="date"]').nth(1).fill(NEXT_WEEK);
     await page.getByRole('button', { name: /^Create$/ }).click();
     await page.waitForTimeout(700);
 
     // Click edit pencil
-    await page.getByRole('button', { title: /edit roadmap/i }).click();
-    await page.getByPlaceholder(/name/i).fill('Updated Roadmap');
-    await page.getByRole('button', { name: /save/i }).click();
+    await page.getByTitle(/edit roadmap/i).first().click();
+    await page.getByPlaceholder('Q3 2024 Release').fill('Updated Roadmap');
+    await page.getByRole('button', { name: 'Save' }).click();
     await page.waitForTimeout(700);
 
     await expect(page.getByText('Updated Roadmap')).toBeVisible();
@@ -81,16 +81,16 @@ test.describe('Roadmaps', () => {
     await expect(page).toHaveURL(/\/roadmaps$/);
 
     // Create
-    await page.getByRole('button', { name: /create roadmap/i }).click();
-    await page.getByPlaceholder(/name/i).fill('Delete Test');
+    await page.getByRole('button', { name: /create roadmap/i }).first().click();
+    await page.getByPlaceholder('Q3 2024 Release').fill('Delete Test');
     await page.locator('input[type="date"]').first().fill(TOMORROW);
     await page.locator('input[type="date"]').nth(1).fill(NEXT_WEEK);
     await page.getByRole('button', { name: /^Create$/ }).click();
     await page.waitForTimeout(700);
 
-    // Delete
-    page.on('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: /^Delete$/ }).click();
+    // Delete (custom ConfirmModal, not a native dialog)
+    await page.getByRole('button', { name: /^Delete$/ }).first().click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
     await page.waitForTimeout(500);
 
     await expect(page.getByText('Delete Test')).not.toBeVisible();

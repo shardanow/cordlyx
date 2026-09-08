@@ -19,7 +19,7 @@ test.describe('Quick create', () => {
 
     // Click Create item
     await page.getByRole('button', { name: /create item/i }).first().click();
-    await expect(page.getByText('Quick create')).toBeVisible({ timeout: 3000 });
+    await expect(page.getByRole('heading', { name: 'Quick create' })).toBeVisible({ timeout: 3000 });
 
     const title = `Board QC ${Date.now()}`;
     await page.getByPlaceholder('Item title...').fill(title);
@@ -44,7 +44,7 @@ test.describe('Quick create', () => {
 
     // Click Create item on the list page
     await page.getByRole('button', { name: /create item/i }).first().click();
-    await expect(page.getByText('Quick create')).toBeVisible({ timeout: 3000 });
+    await expect(page.getByRole('heading', { name: 'Quick create' })).toBeVisible({ timeout: 3000 });
 
     const title = `List QC ${Date.now()}`;
     await page.getByPlaceholder('Item title...').fill(title);
@@ -68,10 +68,13 @@ test.describe('Quick create', () => {
     await page.keyboard.press('Meta+k');
     await page.waitForTimeout(500);
 
-    const quickCreateBtn = page.getByRole('button', { name: /quick create/i });
-    if (await quickCreateBtn.isVisible()) {
-      await quickCreateBtn.click();
+    // Meta+K may already have opened the modal (then the sidebar button
+    // sits behind the overlay and is not clickable) — only click if needed.
+    const qcHeading = page.getByRole('heading', { name: 'Quick create' });
+    if (!(await qcHeading.isVisible())) {
+      await page.getByRole('button', { name: /quick create/i }).click();
     }
+    await expect(qcHeading).toBeVisible({ timeout: 3000 });
 
     // Submit button should be disabled with empty title
     const submitBtn = page.getByRole('button', { name: /^Create$/ });

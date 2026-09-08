@@ -49,7 +49,7 @@ test.describe('Board drag-and-drop', () => {
     const createBtn = page.getByRole('button', { name: /create item/i }).first();
     await createBtn.click();
 
-    await expect(page.getByText('Quick create')).toBeVisible({ timeout: 3000 });
+    await expect(page.getByRole('heading', { name: 'Quick create' })).toBeVisible({ timeout: 3000 });
     await page.getByPlaceholder('Item title...').fill(`Board item ${Date.now()}`);
     await page.getByRole('button', { name: /^Create$/ }).click();
     await page.waitForTimeout(1500);

@@ -173,7 +173,19 @@ jobs:
           path: postman/
 
       - name: Run Playwright (UI + API contract)
-        run: npx playwright test
+        # Serial workers: every UI test logs in via POST /auth/login
+        # (10 req/min per IP). Parallel workers burst past the throttle
+        # and fail with 429 instead of testing the UI.
+        run: npx playwright test --workers=1
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            test-results/
+            playwright-report/
 
       - name: Dump backend log on failure
         if: failure()

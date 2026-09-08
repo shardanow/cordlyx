@@ -21,19 +21,19 @@ test.describe('Keyboard shortcuts', () => {
     await page.keyboard.press('?');
     await page.waitForTimeout(500);
 
-    await expect(page.getByText(/shortcuts|keyboard/i)).toBeVisible({ timeout: 3000 });
+    await expect(page.getByRole('heading', { name: 'Keyboard shortcuts' })).toBeVisible({ timeout: 3000 });
   });
 
   test('should close shortcuts modal with Escape', async ({ page }) => {
     await loginAndGoToProject(page);
 
     await page.keyboard.press('?');
-    await expect(page.getByText(/shortcuts|keyboard/i)).toBeVisible({ timeout: 3000 });
+    await expect(page.getByRole('heading', { name: 'Keyboard shortcuts' })).toBeVisible({ timeout: 3000 });
 
     await page.keyboard.press('Escape');
     await page.waitForTimeout(500);
 
-    await expect(page.getByText(/shortcuts|keyboard/i)).not.toBeVisible({ timeout: 3000 });
+    await expect(page.getByRole('heading', { name: 'Keyboard shortcuts' })).not.toBeVisible({ timeout: 3000 });
   });
 
   test('should open search with / key', async ({ page }) => {
@@ -42,18 +42,20 @@ test.describe('Keyboard shortcuts', () => {
     await page.keyboard.press('/');
     await page.waitForTimeout(500);
 
-    await expect(page.getByPlaceholder('Search items...')).toBeVisible({ timeout: 3000 });
+    // Scoped to the modal overlay: the list page FilterBar uses the same placeholder
+    await expect(page.locator('.fixed.inset-0 input[placeholder="Search items..."]')).toBeVisible({ timeout: 3000 });
   });
 
   test('should close search modal with Escape', async ({ page }) => {
     await loginAndGoToProject(page);
 
     await page.keyboard.press('/');
-    await expect(page.getByPlaceholder('Search items...')).toBeVisible({ timeout: 3000 });
+    const modalSearch = page.locator('.fixed.inset-0 input[placeholder="Search items..."]');
+    await expect(modalSearch).toBeVisible({ timeout: 3000 });
 
     await page.keyboard.press('Escape');
     await page.waitForTimeout(500);
 
-    await expect(page.getByPlaceholder('Search items...')).not.toBeVisible({ timeout: 3000 });
+    await expect(modalSearch).not.toBeVisible({ timeout: 3000 });
   });
 });

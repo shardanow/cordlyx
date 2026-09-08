@@ -28,9 +28,9 @@ test.describe('Plans', () => {
     await page.getByRole('link', { name: /plans/i }).click();
     await expect(page).toHaveURL(/\/plans$/);
 
-    await page.getByRole('button', { name: /create plan/i }).click();
-    await page.getByPlaceholder(/name/i).fill('Sprint 1');
-    await page.getByRole('button', { name: /create$/i }).click();
+    await page.getByRole('button', { name: /create plan/i }).first().click();
+    await page.getByPlaceholder('Plan name').fill('Sprint 1');
+    await page.locator('form').getByRole('button', { name: 'Create plan' }).click();
     await page.waitForTimeout(500);
 
     await expect(page.getByText('Sprint 1')).toBeVisible();
@@ -48,15 +48,15 @@ test.describe('Plans', () => {
     await expect(page).toHaveURL(/\/plans$/);
 
     // Create a plan first
-    await page.getByRole('button', { name: /create plan/i }).click();
-    await page.getByPlaceholder(/name/i).fill('Edit Test');
-    await page.getByRole('button', { name: /create$/i }).click();
+    await page.getByRole('button', { name: /create plan/i }).first().click();
+    await page.getByPlaceholder('Plan name').fill('Edit Test');
+    await page.locator('form').getByRole('button', { name: 'Create plan' }).click();
     await page.waitForTimeout(500);
 
     // Edit it
-    await page.getByRole('button', { name: /edit/i }).click();
-    await page.getByPlaceholder(/name/i).fill('Edited Plan');
-    await page.getByRole('button', { name: /save|update/i }).click();
+    await page.getByTitle('Edit plan').first().click();
+    await page.getByPlaceholder('Plan name').fill('Edited Plan');
+    await page.getByRole('button', { name: 'Save changes' }).click();
     await page.waitForTimeout(500);
 
     await expect(page.getByText('Edited Plan')).toBeVisible();
@@ -74,16 +74,16 @@ test.describe('Plans', () => {
     await expect(page).toHaveURL(/\/plans$/);
 
     // Create a plan first
-    await page.getByRole('button', { name: /create plan/i }).click();
-    await page.getByPlaceholder(/name/i).fill('Delete Me');
-    await page.getByRole('button', { name: /create$/i }).click();
+    await page.getByRole('button', { name: /create plan/i }).first().click();
+    await page.getByPlaceholder('Plan name').fill('Delete Me');
+    await page.locator('form').getByRole('button', { name: 'Create plan' }).click();
     await page.waitForTimeout(500);
 
     await expect(page.getByText('Delete Me')).toBeVisible();
 
-    // Delete it
-    await page.getByRole('button', { name: /delete/i }).click();
-    page.on('dialog', (dialog) => dialog.accept());
+    // Delete it (custom ConfirmModal, not a native dialog)
+    await page.getByTitle('Delete plan').first().click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
     await page.waitForTimeout(500);
 
     await expect(page.getByText('Delete Me')).not.toBeVisible();

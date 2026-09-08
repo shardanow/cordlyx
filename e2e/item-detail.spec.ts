@@ -39,7 +39,7 @@ test.describe('Item detail', () => {
   test('should show attachments section', async ({ page }) => {
     await loginAndOpenItem(page);
 
-    await expect(page.getByText(/attachments/i)).toBeVisible({ timeout: 3000 });
+    await expect(page.getByText('Attachments', { exact: true })).toBeVisible({ timeout: 3000 });
   });
 
   test('should show activity section', async ({ page }) => {

@@ -21,13 +21,13 @@ test.describe('Item lifecycle', () => {
     // Fallback to Ctrl+K for non-Mac
     await page.waitForTimeout(500);
 
-    // If meta didn't work, try the button
-    const quickCreateBtn = page.getByRole('button', { name: /quick create/i });
-    if (await quickCreateBtn.isVisible()) {
-      await quickCreateBtn.click();
+    // Meta+K may already have opened the modal (then the sidebar button
+    // sits behind the overlay and is not clickable) — only click if needed.
+    const qcHeading = page.getByRole('heading', { name: 'Quick create' });
+    if (!(await qcHeading.isVisible())) {
+      await page.getByRole('button', { name: /quick create/i }).click();
     }
-
-    await expect(page.getByText('Quick create')).toBeVisible({ timeout: 3000 });
+    await expect(qcHeading).toBeVisible({ timeout: 5000 });
 
     // Fill and submit
     await page.getByPlaceholder('Item title...').fill(TITLE);
@@ -49,11 +49,11 @@ test.describe('Item lifecycle', () => {
     await page.getByText('Demo').first().click();
     await page.keyboard.press('Meta+k');
     await page.waitForTimeout(500);
-    const quickCreateBtn = page.getByRole('button', { name: /quick create/i });
-    if (await quickCreateBtn.isVisible()) {
-      await quickCreateBtn.click();
+    const qcHeading2 = page.getByRole('heading', { name: 'Quick create' });
+    if (!(await qcHeading2.isVisible())) {
+      await page.getByRole('button', { name: /quick create/i }).click();
     }
-    await expect(page.getByText('Quick create')).toBeVisible({ timeout: 3000 });
+    await expect(qcHeading2).toBeVisible({ timeout: 5000 });
 
     const title = `List Check ${Date.now()}`;
     await page.getByPlaceholder('Item title...').fill(title);
@@ -77,8 +77,9 @@ test.describe('Item lifecycle', () => {
     await page.getByText('Demo').first().click();
     await expect(page).toHaveURL(/\/projects\/demo/);
 
-    // Click the first item in the list
-    const firstItemLink = page.getByRole('link', { name: /#\d+/ }).first();
+    // Click the first item in the list (desktop rows link the title,
+    // mobile rows show #seq — href works for both viewports)
+    const firstItemLink = page.locator('a[href*="/items/"]').first();
     await firstItemLink.click();
     await expect(page).toHaveURL(/\/items\/\d+/);
 
@@ -113,7 +114,7 @@ test.describe('Item lifecycle', () => {
     await expect(page).toHaveURL(/\/projects\/demo/);
 
     // Click the first item
-    const firstItemLink = page.getByRole('link', { name: /#\d+/ }).first();
+    const firstItemLink = page.locator('a[href*="/items/"]').first();
     await firstItemLink.click();
     await expect(page).toHaveURL(/\/items\/\d+/);
 
