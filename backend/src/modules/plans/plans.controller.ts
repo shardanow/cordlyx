@@ -3,6 +3,16 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { ApiKeyOrJwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole } from '../../common/index.js';
+import {
+  ApiZodBody,
+  ApiProjectSlugParam,
+  ApiUuidParam,
+  ApiDedupeQuery,
+  ApiDryRunQuery,
+  ApiExportFormatQuery,
+  ApiErrorResponses,
+  ApiListResponse,
+} from '../../common/index.js';
 import { PlansService } from './plans.service.js';
 import { PlansTransferService, plansBulkSchema } from './plans-transfer.service.js';
 import { TRANSFER_MAX_BYTES, parseFlag, stripInternal } from '../../common/transfer.util.js';
@@ -18,11 +28,20 @@ export class PlansController {
   ) {}
 
   @Get()
+  @ApiOperation({ summary: 'List project plans' })
+  @ApiProjectSlugParam()
+  @ApiListResponse('Plans, e.g. Sprint 1 / Q3 Release.')
+  @ApiErrorResponses(401, 403, 429)
   async list(@Req() req: Request) {
     return this.plansService.list(req.projectId as string);
   }
 
   @Post()
+  @ApiOperation({ summary: 'Create a plan' })
+  @ApiProjectSlugParam()
+  @ApiZodBody(createPlanSchema)
+  @ApiResponse({ status: 201, description: 'The created plan.' })
+  @ApiErrorResponses(400, 401, 403, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
   async create(@Req() req: Request, @Body() body: unknown) {
@@ -31,6 +50,12 @@ export class PlansController {
   }
 
   @Patch(':id')
+  @ApiOperation({ summary: 'Update a plan (partial)' })
+  @ApiProjectSlugParam()
+  @ApiUuidParam('id', 'Plan id.')
+  @ApiZodBody(updatePlanSchema)
+  @ApiResponse({ status: 200, description: 'The updated plan.' })
+  @ApiErrorResponses(400, 401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
   async update(@Req() req: Request, @Param('id') id: string, @Body() body: unknown) {
@@ -39,6 +64,11 @@ export class PlansController {
   }
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete a plan' })
+  @ApiProjectSlugParam()
+  @ApiUuidParam('id', 'Plan id.')
+  @ApiResponse({ status: 200, description: '{ success: true }.' })
+  @ApiErrorResponses(401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
   async delete(@Req() req: Request, @Param('id') id: string) {
@@ -47,7 +77,10 @@ export class PlansController {
 
   @Get('export')
   @ApiOperation({ summary: 'Export project plans as CSV, JSON or JSONL (?format=csv|json|jsonl)' })
+  @ApiProjectSlugParam()
+  @ApiExportFormatQuery()
   @ApiResponse({ status: 200, description: 'File download with Content-Disposition: attachment' })
+  @ApiErrorResponses(401, 403, 429)
   async export(
     @Param('projectSlug') slug: string,
     @Req() req: Request,
@@ -71,7 +104,12 @@ export class PlansController {
 
   @Post('bulk')
   @ApiOperation({ summary: 'Create up to 100 plans in one request (supports dedupe and dryRun)' })
+  @ApiProjectSlugParam()
+  @ApiZodBody(plansBulkSchema, 'Plans array (or raw array, normalized server-side).')
+  @ApiDedupeQuery()
+  @ApiDryRunQuery()
   @ApiResponse({ status: 201, description: 'Per-item results: created | skipped | failed' })
+  @ApiErrorResponses(400, 401, 403, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
   async bulk(
@@ -91,11 +129,15 @@ export class PlansController {
 
   @Post('import')
   @ApiOperation({ summary: 'Import plans from a CSV, JSON or JSONL file (max 10 MB, 100 rows)' })
+  @ApiProjectSlugParam()
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: { type: 'object', properties: { file: { type: 'string', format: 'binary' } }, required: ['file'] },
   })
+  @ApiDedupeQuery()
+  @ApiDryRunQuery()
   @ApiResponse({ status: 201, description: 'Per-row results: created | skipped | failed' })
+  @ApiErrorResponses(400, 401, 403, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: TRANSFER_MAX_BYTES } }))
