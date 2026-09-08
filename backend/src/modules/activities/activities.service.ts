@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { getDb } from '../../database/client.js';
+import { decodeCursorDate } from '../../common/cursors.js';
 import { activities } from '../../database/schema/activities.js';
 import { items as itemsTable } from '../../database/schema/items.js';
 import { users } from '../../database/schema/users.js';
@@ -24,7 +25,7 @@ export class ActivitiesService {
     if (dateTo) conditions.push(sql`${activities.createdAt} < ${dateTo}::timestamptz + interval '1 day'`);
 
     if (cursor) {
-      const [cursorDate] = Buffer.from(cursor, 'base64').toString('utf-8').split('|');
+      const { date: cursorDate } = decodeCursorDate(cursor);
       conditions.push(
         sort === '-created_at'
           ? sql`${activities.createdAt} < ${cursorDate}::timestamptz`
@@ -76,7 +77,7 @@ export class ActivitiesService {
     const conditions: ReturnType<typeof eq>[] = [eq(activities.itemId, itemId)];
 
     if (cursor) {
-      const [cursorDate] = Buffer.from(cursor, 'base64').toString('utf-8').split('|');
+      const { date: cursorDate } = decodeCursorDate(cursor);
       conditions.push(sql`${activities.createdAt} < ${cursorDate}::timestamptz`);
     }
 

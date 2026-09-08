@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { join } from 'path';
 import { access } from 'node:fs/promises';
 import { AppModule } from './app.module.js';
@@ -37,6 +38,21 @@ async function bootstrap() {
   }));
   app.useGlobalFilters(new AllExceptionsFilter());
   app.setGlobalPrefix('api/v1', { exclude: [{ path: 'health', method: 0 }] });
+
+  // OpenAPI docs (Swagger UI at /api/docs, raw JSON at /api/docs-json).
+  // Served directly on the HTTP adapter, so the global api/v1 prefix does not apply.
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('CordLyx API')
+    .setDescription(
+      'Project-management API: items (create, bulk, import, export), comments, plans, roadmaps, webhooks. ' +
+        'Authenticate with either "Authorization: Bearer <jwt>" or the "X-API-Key: clx_..." header.',
+    )
+    .setVersion('1.0')
+    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'jwt')
+    .addApiKey({ type: 'apiKey', in: 'header', name: 'X-API-Key' }, 'api-key')
+    .build();
+  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, swaggerDocument);
   app.enableCors({
     origin: process.env.NODE_ENV === 'production' ? process.env.CORS_ORIGIN : ['http://localhost:3000'],
     credentials: true,

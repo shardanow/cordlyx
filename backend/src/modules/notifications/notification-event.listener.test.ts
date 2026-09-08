@@ -17,9 +17,11 @@ describe('NotificationEventListener (unit)', () => {
   function createListener(
     mockService: Partial<NotificationsService>,
     mockGateway: Partial<EventsGateway> = {},
+    mockPrefs: { isMuted?: (userId: string, projectId: string) => Promise<boolean> } = {},
   ) {
     const gateway = { emitToUser: vi.fn(), ...mockGateway } as unknown as EventsGateway;
-    return { listener: new NotificationEventListener(mockService as NotificationsService, gateway), gateway };
+    const prefs = { isMuted: async () => false, ...mockPrefs } as any;
+    return { listener: new NotificationEventListener(mockService as NotificationsService, gateway, prefs), gateway };
   }
 
   it('should create mention notification for @mentioned user', async () => {
@@ -110,6 +112,36 @@ describe('NotificationEventListener (unit)', () => {
       actorId: 'user-1',
     });
 
+    expect(createSpy).not.toHaveBeenCalled();
+  });
+
+  it('should skip notifications for muted projects', async () => {
+    const createSpy = vi.fn(async () => ({ id: 'notif-3' }));
+    const { listener } = createListener(
+      {
+        findMembersByMention: async () => ['user-2'],
+        create: createSpy,
+      },
+      {},
+      { isMuted: async () => true },
+    );
+
+    await listener.onCommentCreated({
+      projectId: 'proj-1',
+      itemId: 'item-1',
+      comment: { id: 'cmt-1', body: '<span data-label="bob">@bob</span>' },
+      actorId: 'user-1',
+    });
+    expect(createSpy).not.toHaveBeenCalled();
+
+    await listener.onItemAssigned({
+      projectId: 'proj-1',
+      item: { id: 'item-1', assigneeId: 'user-2' },
+      oldAssigneeId: null,
+      oldValue: null,
+      newValue: 'User Two',
+      actorId: 'user-1',
+    });
     expect(createSpy).not.toHaveBeenCalled();
   });
 });

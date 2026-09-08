@@ -53,6 +53,11 @@ jobs:
             # Backup DB before touching running services (best effort, never blocks deploy)
             ./backup/backup.sh --db || true
 
+            # Apply pending DB migrations BEFORE new code starts.
+            # migrate.sh is idempotent; any failure stops the deploy here
+            # while the old code+schema keeps serving.
+            COMPOSE_FILE=docker-compose.prod.yml ./scripts/migrate.sh
+
             $COMPOSE up -d --build
 
             # nginx.conf is bind-mounted: `up` does not recreate nginx on

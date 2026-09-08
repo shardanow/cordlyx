@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { api } from '@/lib/api-client';
 import { Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AvatarCircle } from '@/components/features/AvatarCircle';
 
 interface Notification {
     id: string;
@@ -124,9 +125,7 @@ export default function NotificationsButton({ collapsed }: { collapsed?: boolean
 
                                 const card = (
                                     <div className="flex items-start gap-2">
-                                        <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-medium shrink-0 mt-0.5">
-                                            {n.actor?.name?.charAt(0) ?? '?'}
-                                        </div>
+                                        <AvatarCircle name={n.actor?.name ?? '?'} avatarUrl={n.actor?.avatarUrl} size="xs" className="mt-0.5" />
                                         <div className="flex-1 min-w-0">
                                             <p className="text-xs font-medium">
                                                 <span>{n.actor?.name ?? 'Someone'}</span>{' '}

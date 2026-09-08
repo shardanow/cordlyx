@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { getDb } from '../../database/client.js';
+import { decodeCursorDate } from '../../common/cursors.js';
 import { notifications } from '../../database/schema/notifications.js';
 import { users } from '../../database/schema/users.js';
 import { projectMembers } from '../../database/schema/members.js';
@@ -63,8 +64,8 @@ export class NotificationsService {
     const db = getDb();
     const conditions = [eq(notifications.userId, userId)] as any[];
     if (cursor) {
-      const [cursorDate] = Buffer.from(cursor, 'base64').toString('utf-8').split('|');
-      conditions.push(lt(notifications.createdAt, new Date(cursorDate!)));
+      const { date: cursorDate } = decodeCursorDate(cursor);
+      conditions.push(lt(notifications.createdAt, new Date(cursorDate)));
     }
     const rows = await db
       .select({

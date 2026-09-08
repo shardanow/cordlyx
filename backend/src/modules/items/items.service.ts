@@ -2,14 +2,15 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { randomUUID } from 'node:crypto';
 import { unlink } from 'node:fs/promises';
 import { join } from 'node:path';
-import { getDb } from '../../database/client.js';
+import { getDb, type DbClient } from '../../database/client.js';
+import { decodeCursorDate } from '../../common/cursors.js';
 import { items } from '../../database/schema/items.js';
 import { attachments } from '../../database/schema/attachments.js';
 import { tags as tagsTable, itemTags } from '../../database/schema/tags.js';
 import { issueSequences } from '../../database/schema/sequences.js';
 import { itemStatuses, itemPriorities, itemTypes } from '../../database/schema/config.js';
 import { users } from '../../database/schema/users.js';
-import { eq, and, sql, desc, isNull } from 'drizzle-orm';
+import { eq, and, sql, desc, gt, isNull, inArray } from 'drizzle-orm';
 
 @Injectable()
 export class ItemsService {
@@ -33,83 +34,88 @@ export class ItemsService {
     },
     reporterId: string,
   ) {
-    const db = getDb();
+    // Sequence bump + insert (+ tags) are atomic: a later failure
+    // (bad FK, missing defaults) never leaves gaps or orphans.
+    const itemId = await getDb().transaction(async (txx) => {
+      const db = txx as unknown as DbClient;
+      const seq = await db
+        .update(issueSequences)
+        .set({ lastValue: sql`${issueSequences.lastValue} + 1` })
+        .where(eq(issueSequences.projectId, projectId))
+        .returning({ lastValue: issueSequences.lastValue });
 
-    const seq = await db
-      .update(issueSequences)
-      .set({ lastValue: sql`${issueSequences.lastValue} + 1` })
-      .where(eq(issueSequences.projectId, projectId))
-      .returning({ lastValue: issueSequences.lastValue });
-
-    if (!seq[0]) {
-      throw new NotFoundException('Project sequence not found');
-    }
-
-    let statusId = data.statusId;
-    if (!statusId) {
-      const defaultStatus = await db
-        .select({ id: itemStatuses.id })
-        .from(itemStatuses)
-        .where(and(eq(itemStatuses.projectId, projectId), eq(itemStatuses.isDefault, true), eq(itemStatuses.category, 'inbox')))
-        .limit(1);
-      statusId = defaultStatus[0]?.id;
-    }
-
-    let priorityId = data.priorityId;
-    if (!priorityId) {
-      const defaultPriority = await db
-        .select({ id: itemPriorities.id })
-        .from(itemPriorities)
-        .where(and(eq(itemPriorities.projectId, projectId), eq(itemPriorities.isDefault, true)))
-        .limit(1);
-      priorityId = defaultPriority[0]?.id;
-    }
-
-    if (!statusId || !priorityId) {
-      throw new NotFoundException('Default status or priority not configured');
-    }
-
-    const itemId = randomUUID();
-    const sequenceNum = seq[0].lastValue!;
-
-    if (data.parentId) {
-      const parent = await db
-        .select({ id: items.id })
-        .from(items)
-        .where(and(eq(items.id, data.parentId), eq(items.projectId, projectId), isNull(items.deletedAt)))
-        .limit(1);
-      if (!parent[0]) {
-        throw new BadRequestException('Parent item not found in this project');
+      if (!seq[0]) {
+        throw new NotFoundException('Project sequence not found');
       }
-      if (data.parentId === itemId) {
-        throw new BadRequestException('Item cannot be its own parent');
-      }
-    }
 
-    await db.insert(items).values({
-      id: itemId,
-      projectId,
-      sequenceNum: sequenceNum as any,
-      typeId: data.typeId,
-      statusId,
-      priorityId,
-      assigneeId: data.assigneeId ?? null,
-      reporterId,
-      parentId: data.parentId ?? null,
-      title: data.title,
-      description: data.description ?? null,
-      dueDate: data.dueDate ? new Date(data.dueDate) : null,
-      startDate: data.startDate ? new Date(data.startDate) : null,
-      estimatedHours: (data.estimatedHours ?? null) as any,
-      planId: data.planId ?? null,
-      roadmapId: data.roadmapId ?? null,
+      let statusId = data.statusId;
+      if (!statusId) {
+        const defaultStatus = await db
+          .select({ id: itemStatuses.id })
+          .from(itemStatuses)
+          .where(and(eq(itemStatuses.projectId, projectId), eq(itemStatuses.isDefault, true), eq(itemStatuses.category, 'inbox')))
+          .limit(1);
+        statusId = defaultStatus[0]?.id;
+      }
+
+      let priorityId = data.priorityId;
+      if (!priorityId) {
+        const defaultPriority = await db
+          .select({ id: itemPriorities.id })
+          .from(itemPriorities)
+          .where(and(eq(itemPriorities.projectId, projectId), eq(itemPriorities.isDefault, true)))
+          .limit(1);
+        priorityId = defaultPriority[0]?.id;
+      }
+
+      if (!statusId || !priorityId) {
+        throw new NotFoundException('Default status or priority not configured');
+      }
+
+      const newId = randomUUID();
+      const sequenceNum = seq[0].lastValue!;
+
+      if (data.parentId) {
+        const parent = await db
+          .select({ id: items.id })
+          .from(items)
+          .where(and(eq(items.id, data.parentId), eq(items.projectId, projectId), isNull(items.deletedAt)))
+          .limit(1);
+        if (!parent[0]) {
+          throw new BadRequestException('Parent item not found in this project');
+        }
+        if (data.parentId === newId) {
+          throw new BadRequestException('Item cannot be its own parent');
+        }
+      }
+
+      await db.insert(items).values({
+        id: newId,
+        projectId,
+        sequenceNum: sequenceNum as any,
+        typeId: data.typeId,
+        statusId,
+        priorityId,
+        assigneeId: data.assigneeId ?? null,
+        reporterId,
+        parentId: data.parentId ?? null,
+        title: data.title,
+        description: data.description ?? null,
+        dueDate: data.dueDate ? new Date(data.dueDate) : null,
+        startDate: data.startDate ? new Date(data.startDate) : null,
+        estimatedHours: (data.estimatedHours ?? null) as any,
+        planId: data.planId ?? null,
+        roadmapId: data.roadmapId ?? null,
+      });
+
+      if (data.tagIds?.length) {
+        await db.insert(itemTags).values(
+          data.tagIds.map((tagId) => ({ itemId: newId, tagId })),
+        );
+      }
+
+      return newId;
     });
-
-    if (data.tagIds?.length) {
-      await db.insert(itemTags).values(
-        data.tagIds.map((tagId) => ({ itemId, tagId })),
-      );
-    }
 
     return this.getById(projectId, itemId);
   }
@@ -212,7 +218,7 @@ export class ItemsService {
     }
 
     if (filters.cursor) {
-      const [cursorDate] = Buffer.from(filters.cursor, 'base64').toString('utf-8').split('|');
+      const { date: cursorDate } = decodeCursorDate(filters.cursor);
       conditions.push(sql`${items.createdAt} < ${cursorDate}::timestamptz`);
     }
 
@@ -283,8 +289,11 @@ export class ItemsService {
         planId: items.planId,
       })
       .from(items)
-      .where(and(eq(items.id, itemId), eq(items.projectId, projectId)))
+      .where(and(eq(items.id, itemId), eq(items.projectId, projectId), isNull(items.deletedAt)))
       .limit(1);
+    if (!oldRow) {
+      throw new NotFoundException('Item not found');
+    }
     const oldValues = {
       assigneeId: oldRow?.assigneeId ?? null,
       statusId: oldRow?.statusId ?? null,
@@ -327,10 +336,16 @@ export class ItemsService {
   async softDelete(projectId: string, itemId: string) {
     const db = getDb();
     const [oldItem] = await db
-      .select({ title: items.title })
+      .select({ title: items.title, deletedAt: items.deletedAt })
       .from(items)
       .where(and(eq(items.id, itemId), eq(items.projectId, projectId)))
       .limit(1);
+    if (!oldItem) {
+      throw new NotFoundException('Item not found');
+    }
+    if (oldItem.deletedAt) {
+      return { success: true, title: oldItem.title };
+    }
 
     // Clean up attachments: delete physical files and DB records
     const itemAttachments = await db
@@ -360,6 +375,14 @@ export class ItemsService {
     data: { statusId: string; sortOrder?: number },
   ) {
     const db = getDb();
+    const [existing] = await db
+      .select({ id: items.id })
+      .from(items)
+      .where(and(eq(items.id, itemId), eq(items.projectId, projectId), isNull(items.deletedAt)))
+      .limit(1);
+    if (!existing) {
+      throw new NotFoundException('Item not found');
+    }
     const updateData: Record<string, unknown> = {
       statusId: data.statusId,
       updatedAt: new Date(),
@@ -372,6 +395,48 @@ export class ItemsService {
       .where(and(eq(items.id, itemId), eq(items.projectId, projectId), isNull(items.deletedAt)));
 
     return this.getById(projectId, itemId);
+  }
+
+  /**
+   * Incremental sync for offline-capable clients: all items touched after
+   * `since` (including soft-deleted stubs), oldest first. When truncated,
+   * clients must fall back to a full list (fullSyncRequired).
+   */
+  async syncSince(projectId: string, since: Date, limit = 200) {
+    const db = getDb();
+    const safeLimit = Math.min(Math.max(limit, 1), 1000);
+    const rows = await db
+      .select()
+      .from(items)
+      .where(and(eq(items.projectId, projectId), gt(items.updatedAt, since)))
+      .orderBy(items.updatedAt)
+      .limit(safeLimit + 1);
+
+    const hasMore = rows.length > safeLimit;
+    const page = rows.slice(0, safeLimit);
+    const liveIds = page.filter((r) => !r.deletedAt).map((r) => r.id);
+    const tagMap = new Map<string, string[]>();
+    if (liveIds.length > 0) {
+      const tagRows = await db
+        .select({ itemId: itemTags.itemId, tagId: itemTags.tagId })
+        .from(itemTags)
+        .where(inArray(itemTags.itemId, liveIds));
+      for (const t of tagRows) {
+        const list = tagMap.get(t.itemId) ?? [];
+        list.push(t.tagId);
+        tagMap.set(t.itemId, list);
+      }
+    }
+
+    const data = page.map((r) =>
+      r.deletedAt
+        ? { id: r.id, sequenceNum: r.sequenceNum, deleted: true as const, updatedAt: r.updatedAt.toISOString() }
+        : { ...r, tagIds: tagMap.get(r.id) ?? [] },
+    );
+    return {
+      data,
+      meta: { serverTime: new Date().toISOString(), hasMore, fullSyncRequired: hasMore },
+    };
   }
 
   async exportAll(projectId: string, format: 'csv' | 'json' | 'jsonl') {

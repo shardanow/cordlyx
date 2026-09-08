@@ -139,6 +139,7 @@ Backend-only:
 | 11 | `report` | Tests with coverage report |
 | 12 | — | Kill all processes |
 | 13-15 | — | Backup shortcuts |
+| 16 | `doctor` | Environment check (toolchain, infra, schema, services) |
 
 ## Environment Variables
 

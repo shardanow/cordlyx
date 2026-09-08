@@ -1,15 +1,16 @@
 import { Controller, Post, Body, UseGuards, Req } from '@nestjs/common';
 import { Request } from 'express';
-import { JwtAuthGuard, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
+import { ApiKeyOrJwtAuthGuard, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
 import { ItemsService } from './items.service.js';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { quickCreateSchema } from '@cordlyx/shared';
 import { getDb } from '../../database/client.js';
 import { projects } from '../../database/schema/projects.js';
-import { eq } from 'drizzle-orm';
+import { projectMembers } from '../../database/schema/members.js';
+import { eq, and } from 'drizzle-orm';
 
 @Controller('quick-create')
-@UseGuards(JwtAuthGuard)
+@UseGuards(ApiKeyOrJwtAuthGuard)
 export class QuickCreateController {
   constructor(
     private readonly itemsService: ItemsService,
@@ -41,6 +42,24 @@ export class QuickCreateController {
     if (!project[0]) {
       const { NotFoundException } = await import('@nestjs/common');
       throw new NotFoundException('Project not found');
+    }
+
+    // ProjectMembershipGuard cannot run here (slug comes from the body, not params),
+    // so enforce membership + member role explicitly. Scoped API keys are enforced too.
+    const { ForbiddenException } = await import('@nestjs/common');
+    if (req.apiKeyProjectId && req.apiKeyProjectId !== project[0].id) {
+      throw new ForbiddenException('API key is scoped to another project');
+    }
+    const [membership] = await db
+      .select({ role: projectMembers.role })
+      .from(projectMembers)
+      .where(and(eq(projectMembers.projectId, project[0].id), eq(projectMembers.userId, user.id)))
+      .limit(1);
+    if (!membership) {
+      throw new ForbiddenException('You are not a member of this project');
+    }
+    if (membership.role !== 'member' && membership.role !== 'admin') {
+      throw new ForbiddenException('Requires at least member role');
     }
 
     const item = await this.itemsService.create(

@@ -19,3 +19,6 @@ export * from './roadmap-lanes.js';
 export * from './roadmap-items.js';
 export * from './invites.js';
 export * from './webhooks.js';
+export * from './revoked-refresh-tokens.js';
+export * from './project-views.js';
+export * from './notification-prefs.js';

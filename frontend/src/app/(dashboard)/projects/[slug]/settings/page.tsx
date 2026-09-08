@@ -8,6 +8,8 @@ import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth-store';
 import { toast } from 'sonner';
 import Spinner from '@/components/Spinner';
+import DataTransferSection from '@/components/DataTransferSection';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 
 interface Project {
   id: string;
@@ -384,6 +386,8 @@ export default function SettingsPage() {
         onDelete={onDelete('tags')}
       />
 
+      {slug && <DataTransferSection slug={slug} />}
+
       {/* Webhooks */}
       <div className="border border-border rounded-lg p-4">
         <h3 className="text-base font-medium mb-3">Webhooks</h3>
@@ -411,15 +415,25 @@ const ITEM_EVENTS = [
 
 function WebhookList({ slug }: { slug: string }) {
   const queryClient = useQueryClient();
+  const [openLog, setOpenLog] = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<{ kind: 'remove' | 'regenerate'; id: string } | null>(null);
+  const [rotatedSecret, setRotatedSecret] = useState<string | null>(null);
   const { data: webhooks } = useQuery<any[]>({
     queryKey: ['webhooks', slug],
     queryFn: () => api.get(`/projects/${slug}/webhooks`),
   });
 
   const remove = async (id: string) => {
-    if (!confirm('Delete this webhook?')) return;
     await api.delete(`/projects/${slug}/webhooks/${id}`);
     queryClient.invalidateQueries({ queryKey: ['webhooks', slug] });
+    setConfirmState(null);
+  };
+
+  const regenerate = async (id: string) => {
+    const res = await api.post<{ secret: string }>(`/projects/${slug}/webhooks/${id}/regenerate-secret`);
+    await queryClient.invalidateQueries({ queryKey: ['webhooks', slug] });
+    setRotatedSecret(res.secret);
+    setConfirmState(null);
   };
 
   if (!webhooks || webhooks.length === 0) {
@@ -429,23 +443,96 @@ function WebhookList({ slug }: { slug: string }) {
   return (
     <div className="divide-y divide-border border border-border rounded">
       {webhooks.map((w: any) => (
-        <div key={w.id} className="flex items-center gap-3 px-3 py-2.5">
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-mono truncate">{w.url}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">{w.events?.join(', ') ?? 'All events'}</p>
+        <div key={w.id}>
+          <div className="flex items-center gap-3 px-3 py-2.5">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-mono truncate">{w.url}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{w.events?.join(', ') ?? 'All events'}</p>
+              {w.lastDelivery ? (
+                <p className={`text-[10px] mt-0.5 ${w.lastDelivery.ok ? 'text-green-600' : 'text-red-600'}`}>
+                  Last delivery {new Date(w.lastDelivery.at).toLocaleString()} — {w.lastDelivery.ok ? 'ok' : 'failed'}
+                </p>
+              ) : (
+                <p className="text-[10px] text-muted-foreground mt-0.5">No deliveries yet</p>
+              )}
+            </div>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${w.isActive ? 'bg-green-600/10 text-green-600' : 'bg-muted text-muted-foreground'}`}>
+              {w.isActive ? 'Active' : 'Paused'}
+            </span>
+            <button
+              onClick={() => setOpenLog(openLog === w.id ? null : w.id)}
+              className="text-[10px] text-muted-foreground hover:text-foreground shrink-0"
+            >
+              {openLog === w.id ? 'Hide log' : 'Log'}
+            </button>
+            <button
+              onClick={() => setConfirmState({ kind: 'regenerate', id: w.id })}
+              className="text-[10px] text-muted-foreground hover:text-foreground shrink-0"
+              title="Rotate signing secret"
+            >
+              Rotate secret
+            </button>
+            <button
+              onClick={() => setConfirmState({ kind: 'remove', id: w.id })}
+              className="text-[10px] text-destructive hover:text-destructive/80 shrink-0"
+            >
+              Remove
+            </button>
           </div>
-          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${w.isActive ? 'bg-green-600/10 text-green-600' : 'bg-muted text-muted-foreground'}`}>
-            {w.isActive ? 'Active' : 'Paused'}
-          </span>
-          <button
-            onClick={() => remove(w.id)}
-            className="text-[10px] text-destructive hover:text-destructive/80 shrink-0"
-          >
-            Remove
-          </button>
+          {openLog === w.id && <WebhookDeliveries slug={slug} webhookId={w.id} />}
         </div>
       ))}
+      {rotatedSecret && (
+        <div className="p-2.5 m-2 rounded border border-amber-500/40 bg-amber-500/10">
+          <p className="text-[11px] font-medium mb-1">New signing secret — copy it now, it will never be shown again.</p>
+          <code className="text-[11px] font-mono break-all">{rotatedSecret}</code>
+          <button
+            type="button"
+            onClick={() => setRotatedSecret(null)}
+            className="block text-[10px] text-muted-foreground hover:text-foreground mt-1"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+      <ConfirmModal
+        open={confirmState !== null}
+        title={confirmState?.kind === 'regenerate' ? 'Rotate signing secret?' : 'Delete this webhook?'}
+        message={confirmState?.kind === 'regenerate' ? 'The old secret stops working immediately.' : undefined}
+        confirmLabel={confirmState?.kind === 'regenerate' ? 'Rotate' : 'Delete'}
+        onConfirm={() => {
+          if (!confirmState) return;
+          void (confirmState.kind === 'regenerate'
+            ? regenerate(confirmState.id)
+            : remove(confirmState.id));
+        }}
+        onClose={() => setConfirmState(null)}
+      />
     </div>
+  );
+}
+
+function WebhookDeliveries({ slug, webhookId }: { slug: string; webhookId: string }) {
+  const { data, isLoading } = useQuery<any[]>({
+    queryKey: ['webhook-deliveries', slug, webhookId],
+    queryFn: () => api.get(`/projects/${slug}/webhooks/${webhookId}/deliveries?limit=20`),
+  });
+
+  if (isLoading) return <p className="text-[10px] text-muted-foreground px-3 py-2">Loading…</p>;
+  if (!data || data.length === 0) return <p className="text-[10px] text-muted-foreground px-3 py-2">No attempts yet.</p>;
+  return (
+    <ul className="px-3 py-2 space-y-1 bg-muted/30 border-t border-border max-h-44 overflow-y-auto">
+      {data.map((d: any) => (
+        <li key={d.id} className="text-[10px] font-mono flex flex-wrap gap-x-2">
+          <span className="text-muted-foreground">{new Date(d.createdAt).toLocaleString()}</span>
+          <span>{d.event}</span>
+          <span className={d.success ? 'text-green-600' : 'text-red-600'}>
+            {d.success ? `HTTP ${d.httpStatus}` : (d.errorMessage ?? `HTTP ${d.httpStatus ?? '?'}`)}
+          </span>
+          <span className="text-muted-foreground">try {d.attempt}{d.durationMs != null ? ` · ${d.durationMs}ms` : ''}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -454,6 +541,7 @@ function WebhookForm({ slug }: { slug: string }) {
   const [url, setUrl] = useState('');
   const [events, setEvents] = useState<string[]>([]);
   const [adding, setAdding] = useState(false);
+  const [newSecret, setNewSecret] = useState<string | null>(null);
 
   const toggleEvent = (e: string) => {
     setEvents((prev) => prev.includes(e) ? prev.filter((v) => v !== e) : [...prev, e]);
@@ -464,7 +552,8 @@ function WebhookForm({ slug }: { slug: string }) {
     if (!url.trim()) return;
     setAdding(true);
     try {
-      await api.post(`/projects/${slug}/webhooks`, { url: url.trim(), events });
+      const created = await api.post<{ secret?: string }>(`/projects/${slug}/webhooks`, { url: url.trim(), events });
+      setNewSecret(created.secret ?? null);
       setUrl('');
       setEvents([]);
       queryClient.invalidateQueries({ queryKey: ['webhooks', slug] });
@@ -477,6 +566,19 @@ function WebhookForm({ slug }: { slug: string }) {
 
   return (
     <form onSubmit={handleAdd} className="space-y-3">
+      {newSecret && (
+        <div className="p-2.5 rounded border border-amber-500/40 bg-amber-500/10">
+          <p className="text-[11px] font-medium mb-1">Signing secret — copy now, it will never be shown again.</p>
+          <code className="text-[11px] font-mono break-all">{newSecret}</code>
+          <button
+            type="button"
+            onClick={() => setNewSecret(null)}
+            className="block text-[10px] text-muted-foreground hover:text-foreground mt-1"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
       <input
         value={url}
         onChange={(e) => setUrl(e.target.value)}

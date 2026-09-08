@@ -8,48 +8,147 @@ import {
   Body,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
   Req,
   Res,
-  Header,
   ParseIntPipe,
+  BadRequestException,
 } from '@nestjs/common';
-import { Request } from 'express';
-import { JwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { Request, Response } from 'express';
+import { ApiKeyOrJwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
 import { ItemsService } from './items.service.js';
 import { VotesService } from './votes.service.js';
+import { ItemsImportService, bulkRequestSchema, IMPORT_MAX_BYTES } from './items-import.service.js';
+import { EtagInterceptor } from '../../common/interceptors/etag.interceptor.js';
+import { assertItemInProject } from '../../common/assert-item.js';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { getDb } from '../../database/client.js';
 import { users } from '../../database/schema/users.js';
 import { itemStatuses, itemPriorities } from '../../database/schema/config.js';
 import { plans } from '../../database/schema/plans.js';
 import { itemTags, tags as tagsTable } from '../../database/schema/tags.js';
-import { eq, and, inArray, sql, isNull, ne } from 'drizzle-orm';
+import { eq, and, inArray, sql, isNull } from 'drizzle-orm';
 import { createItemSchema, updateItemSchema, itemFilterSchema } from '@cordlyx/shared';
 import { items } from '../../database/schema/items.js';
 
+@ApiTags('items')
 @Controller('projects/:projectSlug/items')
-@UseGuards(JwtAuthGuard, ProjectMembershipGuard)
+@UseGuards(ApiKeyOrJwtAuthGuard, ProjectMembershipGuard)
 export class ItemsController {
   constructor(
     private readonly itemsService: ItemsService,
     private readonly votesService: VotesService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly importService: ItemsImportService,
   ) {}
 
   @Get()
+  @UseInterceptors(EtagInterceptor)
+  @ApiOperation({ summary: 'List items (cursor pagination, filters). Supports If-None-Match/ETag.' })
   async list(@Req() req: Request, @Query() query: unknown) {
     const filters = itemFilterSchema.parse(query);
     return this.itemsService.list(req.projectId as string, filters);
   }
 
   @Get('export')
-  @Header('Content-Disposition', 'attachment')
+  @UseInterceptors(EtagInterceptor)
+  @ApiOperation({ summary: 'Export project items as CSV, JSON or JSONL (?format=csv|json|jsonl)' })
+  @ApiResponse({ status: 200, description: 'File download with Content-Disposition: attachment' })
   async export(
     @Param('projectSlug') slug: string,
     @Req() req: Request,
     @Query('format') format: string,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    return this.itemsService.exportAll(req.projectId as string, (format as 'csv' | 'json' | 'jsonl') || 'csv');
+    const fmt = format === 'json' || format === 'jsonl' ? format : 'csv';
+    const body = await this.itemsService.exportAll(req.projectId as string, fmt);
+    const ext = fmt === 'jsonl' ? 'jsonl' : fmt;
+    res.set({
+      'Content-Type':
+        fmt === 'csv'
+          ? 'text/csv; charset=utf-8'
+          : fmt === 'json'
+            ? 'application/json; charset=utf-8'
+            : 'application/x-ndjson; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${slug}-items.${ext}"`,
+    });
+    return typeof body === 'string' ? body : JSON.stringify(body, null, 2);
+  }
+
+  @Post('bulk')
+  @ApiOperation({ summary: 'Create up to 100 items in one request (supports dedupe and dryRun)' })
+  @ApiResponse({ status: 201, description: 'Per-item results: created | skipped | failed' })
+  @UseGuards(ProjectRoleGuard)
+  @MinimumRole('member')
+  async bulk(
+    @Req() req: Request,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: unknown,
+    @Query('dedupe') dedupeQuery?: string,
+    @Query('dryRun') dryRunQuery?: string,
+  ) {
+    const normalized = Array.isArray(body) ? { items: body } : body;
+    const parsed = bulkRequestSchema.parse(normalized);
+    const projectId = req.projectId as string;
+    const { data, meta } = await this.importService.bulkCreate(projectId, user.id, parsed.items, {
+      dedupe: parseFlag(dedupeQuery, parsed.dedupe),
+      dryRun: parseFlag(dryRunQuery, parsed.dryRun),
+    });
+    if (!meta.dryRun) {
+      for (const r of data) {
+        if (r.status === 'created' && r.item) {
+          this.eventEmitter.emit('item.created', { projectId, item: r.item, actorId: user.id });
+        }
+      }
+    }
+    return { data: stripInternal(data), meta };
+  }
+
+  @Post('import')
+  @ApiOperation({ summary: 'Import items from a CSV, JSON or JSONL file (max 10 MB, 100 rows)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { file: { type: 'string', format: 'binary' } },
+      required: ['file'],
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Per-row results: created | skipped | failed' })
+  @UseGuards(ProjectRoleGuard)
+  @MinimumRole('member')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: IMPORT_MAX_BYTES } }))
+  async import(
+    @Req() req: Request,
+    @CurrentUser() user: AuthenticatedUser,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Query('dedupe') dedupeQuery?: string,
+    @Query('dryRun') dryRunQuery?: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded (multipart field "file": .csv, .json or .jsonl, max 10 MB)');
+    }
+    const projectId = req.projectId as string;
+    const { data, meta } = await this.importService.importFile(
+      projectId,
+      user.id,
+      { originalname: file.originalname, buffer: file.buffer },
+      {
+        dedupe: parseFlag(dedupeQuery, true),
+        dryRun: parseFlag(dryRunQuery, false),
+      },
+    );
+    if (!meta.dryRun) {
+      for (const r of data) {
+        if (r.status === 'created' && r.item) {
+          this.eventEmitter.emit('item.created', { projectId, item: r.item, actorId: user.id });
+        }
+      }
+    }
+    return { data: stripInternal(data), meta };
   }
 
   @Get(':sequenceNum')
@@ -280,7 +379,20 @@ export class ItemsController {
   }
 
   @Get(':id/votes')
-  async getVotes(@Param('id') id: string) {
+  async getVotes(@Req() req: Request, @Param('id') id: string) {
+    await assertItemInProject(req.projectId as string, id);
     return this.votesService.getVotes(id);
   }
+}
+
+function parseFlag(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  const v = value.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(v)) return true;
+  if (['0', 'false', 'no', 'off'].includes(v)) return false;
+  return fallback;
+}
+
+function stripInternal(results: { item?: unknown }[]) {
+  return results.map(({ item: _item, ...rest }) => rest);
 }

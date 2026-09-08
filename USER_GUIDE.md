@@ -17,13 +17,14 @@
 13. [Invite Links](#invite-links)
 14. [Export](#export)
 15. [API Keys](#api-keys)
-16. [Keyboard Shortcuts](#keyboard-shortcuts)
-17. [Profile & Account](#profile--account)
-18. [Admin Panel](#admin-panel)
-19. [Webhooks](#webhooks)
-20. [Project Settings](#project-settings)
-21. [Behind the Scenes](#behind-the-scenes)
-22. [Demo Data](#demo-data)
+16. [API](#api)
+17. [Keyboard Shortcuts](#keyboard-shortcuts)
+18. [Profile & Account](#profile--account)
+19. [Admin Panel](#admin-panel)
+20. [Webhooks](#webhooks)
+21. [Project Settings](#project-settings)
+22. [Behind the Scenes](#behind-the-scenes)
+23. [Demo Data](#demo-data)
 
 ---
 
@@ -138,7 +139,11 @@ Hover over an item row to reveal quick edit controls for status, priority, and a
 
 ### Saved views
 
-The List tab supports saved filter combinations. Configure filters (type, status, priority, assignee, plan, search), then save the view by name. Saved views persist across browser sessions.
+The List tab supports saved filter combinations. Configure filters (type, status, priority, assignee, plan, search), then save the view by name. Views are stored server-side:
+
+- **Share** a view to make it visible to the whole project (private by default).
+- **Default** (admin): auto-applied when anyone opens the list with empty filters.
+- Manage everything from the **Save view** modal (share/unshare, default, delete). Only the owner or an admin can change a view.
 
 ### Pagination
 
@@ -149,6 +154,10 @@ Items list uses cursor-based pagination. Use prev/next buttons at the bottom to 
 ## Board View (Kanban)
 
 The **Board** tab shows items grouped by status as columns.
+
+### Overview dashboard
+
+The sidebar **Overview** page shows project health at a glance: totals (total/open/done incl. last-7-days), a funnel by status, workload per assignee (open/total), and the overdue list with links. Data comes from `GET /api/v1/projects/:slug/stats`.
 
 ### Drag and drop
 
@@ -271,6 +280,16 @@ The **Notifications** button in the sidebar shows a red badge when you have unre
 - Filter by **Unread** / **All** on the notifications page
 - The badge count updates every 30 seconds
 
+### Notification preferences (Profile)
+
+**Profile → Notifications** lists your projects with per-project settings:
+
+- **Mute** — no @mention/assigned/reaction notifications from this project at all.
+- **Email digest** — unread notifications by email, sent daily at the chosen UTC hour (requires server SMTP, see below).
+- **Send digest now** — one-off digest on demand.
+
+Digest scheduling runs hourly on the server (`digest-hourly` queue job) and fans out to users subscribed for that UTC hour. Without `SMTP_HOST` configured, digest endpoints answer `503` and scheduling is a no-op (set `SMTP_HOST/PORT/USER/PASS/FROM`, `APP_URL` in `.env`).
+
 ---
 
 ## Team Members & Roles
@@ -306,6 +325,55 @@ The invitee must have an account. On the invite page, they click **Accept invita
 
 On the items list page, click **Export CSV** to download all items (including soft-deleted items are excluded) as a CSV file. The file can be opened in any spreadsheet application.
 
+You can also export programmatically:
+
+```bash
+curl -H "Authorization: Bearer <jwt>" "https://your-domain/api/v1/projects/<slug>/items/export?format=csv" -o items.csv
+# ?format=json or ?format=jsonl are also supported
+```
+
+### Import
+
+Click **Import** next to Export CSV to upload a `.csv`, `.json` or `.jsonl` file (max 10 MB, 100 rows per import).
+
+- **CSV columns:** `Title*` (required), `Type`, `Status`, `Priority`, `Assignee` (member email), `Due Date`, `Est. Hours`, `Tags` (comma-separated, auto-created), `Plan`. The file you get from Export CSV can be re-imported as-is.
+- **JSON:** an array of objects with the same fields (camelCase or the export's `typeName`/`statusName`/`priorityName`/`assigneeEmail` keys also work).
+- **JSONL:** one object per line.
+- **Dedupe:** rows matching an existing item by title + type are reported as `skipped`, not duplicated. Re-importing the same file only adds what is missing. Append `?dedupe=false` to force-create everything.
+- **Preview first:** the modal's **Preview** button runs a dry-run (`?dryRun=true`) showing created/skipped/failed counts and per-row errors without writing anything.
+
+Unknown type/status/priority/plan/assignee names are reported per row (`failed`) and do not block the rest of the file.
+
+### Bulk API
+
+For scripts, up to 100 items per request without a file:
+
+```bash
+curl -X POST -H "Authorization: Bearer <jwt>" -H "Content-Type: application/json" \
+  -d '{"items":[{"title":"Fix login","typeId":"<type-uuid>"}],"dryRun":true}' \
+  "https://your-domain/api/v1/projects/<slug>/items/bulk"
+```
+
+Response is per-item: `{ data: [{ index, status: "created"|"skipped"|"failed", id?, sequenceNum?, title, error? }], meta: { created, skipped, failed, dryRun, dedupe } }`.
+
+### Project data hub (Settings → Data)
+
+All import/export lives in **Settings → Data: import & export** (admin only):
+
+| Block | Export | Import |
+|-------|--------|--------|
+| **Items** | CSV / JSON / JSONL | CSV / JSON / JSONL (same rules as above) |
+| **Plans** | CSV / JSON | CSV / JSON, dedupe by name |
+| **Config** | JSON template (types, statuses, priorities, tags) | JSON, upsert by name (updates colors, never deletes, `isDefault` untouched) |
+| **Roadmaps** | JSON per roadmap or all (lanes + schedule, items referenced by `#sequence`) | JSON (lanes auto-created, unknown item numbers reported per entry) |
+| **Snapshot** | One JSON with everything | Merge into this project, or create a new project |
+
+**Snapshot details:**
+- Contains config, plans, items (name-based references: type/status/priority names, assignee email, plan/tag names), relations (pairs of item numbers), roadmaps (lanes + schedule).
+- Not included: comments, attachments, activity history, notifications.
+- Merge re-runs are idempotent (everything `skipped`); item numbers from the source are remapped to the target project automatically.
+- Limits: 2000 items per snapshot, `?dryRun=true` previews without writing.
+
 ---
 
 ## API Keys
@@ -322,10 +390,13 @@ API keys allow scripts, CI/CD pipelines, and integrations to authenticate withou
 
 ### Using an API key
 
-Add the `X-API-Key` header to any request:
+Add the `X-API-Key` header to any request (works on all project endpoints, as an alternative to the JWT `Authorization` header):
 
 ```bash
 curl -H "X-API-Key: clx_..." https://your-domain/api/v1/projects
+curl -X POST -H "X-API-Key: clx_..." -H "Content-Type: application/json" \
+  -d '{"title":"Fix login","typeId":"<type-uuid>"}' \
+  https://your-domain/api/v1/projects/<slug>/items
 ```
 
 ### Revoking a key
@@ -388,14 +459,33 @@ The admin page at `/admin` shows:
 
 Admins can configure webhooks in **Settings → Webhooks**.
 
-When events occur in the project (item created/updated/deleted, comment added/removed, attachment added/removed), CordLyx sends an HTTP POST request to the configured URL with a JSON payload describing the event.
+When events occur in the project (items, comments, attachments, relations, plans, roadmaps), CordLyx sends an HTTP POST request to the configured URL with a JSON payload describing the event.
 
 To add a webhook:
 1. Go to **Settings**
 2. Scroll to **Webhooks**
-3. Enter the target URL
+3. Enter the target URL (must start with `http://` or `https://`)
 4. Select which events to listen for (leave empty for all)
 5. Click **Add webhook**
+6. **Copy the signing secret** — it is shown only once (rotate anytime with "Rotate secret")
+
+### Delivery guarantees
+
+- POST with 10s timeout, JSON body `{ event, projectId, sentAt, data }`, up to **3 attempts** (immediate, +2s, +8s). Only 2xx counts as delivered.
+- Every attempt is logged under the webhook ("Log") — HTTP status, error, duration, attempt number. Logs are kept 30 days.
+- Signature header `X-Cordlyx-Signature: sha256=<hex>` = HMAC-SHA256 of the raw body with your secret. Verify it:
+
+```js
+const crypto = require('node:crypto');
+const expected = 'sha256=' + crypto.createHmac('sha256', SECRET).update(rawBody).digest('hex');
+const ok = crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(req.headers['x-cordlyx-signature'] ?? ''));
+```
+
+Other headers: `X-Cordlyx-Event` (event name), `X-Cordlyx-Delivery` (delivery id). `GET .../webhooks` shows the last delivery per webhook.
+
+### API key rate limits
+
+Each key has a requests/min budget (default 120, editable in **Profile → API Keys**). Exceeding it returns `429`. JWT/IP traffic keeps the shared 60/min budget. Keys also show last-used date.
 
 ---
 
@@ -451,6 +541,35 @@ When you run `./dev.sh reset`, the following demo data is created:
 
 ---
 
+## API
+
+Interactive OpenAPI documentation (Swagger UI) is served by the backend:
+
+- UI: `http://localhost:4000/api/docs`
+- Raw OpenAPI JSON: `http://localhost:4000/api/docs-json`
+
+A full endpoint reference also lives in `ARCHITECTURE.md` (section 5). Item payloads follow the Zod schemas in `packages/shared/src/schemas/index.ts` (`createItemSchema`, `updateItemSchema`).
+
+**Authentication (either works on all project endpoints):**
+
+```bash
+# JWT (15 min access token, see login response)
+curl -H "Authorization: Bearer <jwt>" https://your-domain/api/v1/projects/<slug>/items
+
+# API key (Profile → API Keys, header X-API-Key)
+curl -H "X-API-Key: clx_..." https://your-domain/api/v1/projects/<slug>/items
+```
+
+Scoped keys (`projectId` set via API) only work inside that project; admin and key-management endpoints stay JWT-only.
+
+Manage keys: `GET /api-keys` (list with last-used + budget), `POST /api-keys` (`{ name, projectId?, expiresAt?, rateLimitPerMin? }`), `PATCH /api-keys/:id` (rename / change budget 1–10000), `DELETE /api-keys/:id` (revokes immediately).
+
+Ready-made clients: every CI run publishes a Postman collection + curl cookbook (Actions → latest run → Artifacts → `api-clients`), generated from the live OpenAPI so they never rot. Or generate locally: `curl -sf localhost:4000/api/docs-json -o openapi.json && node scripts/openapi-to-postman.mjs openapi.json postman/`.
+
+**Offline sync & caching:** heavy GETs (items list, board, exports) send a weak `ETag` — repeat with `If-None-Match` for an empty `304`. `GET /api/v1/projects/:slug/sync?since=<ISO>` returns touched items (deleted as `{ id, deleted: true }` stubs) with `meta { serverTime, hasMore, fullSyncRequired }`; when truncated, fall back to a full list.
+
+---
+
 ## What's Implemented
 
 | Feature | Status |
@@ -460,8 +579,9 @@ When you run `./dev.sh reset`, the following demo data is created:
 | Change password | ✅ |
 | Delete account | ✅ |
 | Projects (CRUD, soft-delete) | ✅ |
-| Items (CRUD, pagination, filters, saved views, inline edit) | ✅ |
+| Items (CRUD, pagination, filters, server-side saved views, inline edit) | ✅ |
 | Board view (Kanban) with drag & drop | ✅ |
+| Project overview dashboard (funnel, workload, overdue) | ✅ |
 | Plans (CRUD) | ✅ |
 | Roadmaps (interactive Gantt editor with lanes, drag scheduling) | ✅ |
 | Comments with @mentions, reactions, threading | ✅ |
@@ -472,9 +592,12 @@ When you run `./dev.sh reset`, the following demo data is created:
 | Activity timeline (per project + per item) | ✅ |
 | Real-time WebSocket updates | ✅ |
 | Notifications (@mention, assigned) with dropdown + full page | ✅ |
+| Notification prefs (per-project mute, email digest) | ✅ |
+| Offline sync endpoint + ETag caching | ✅ |
 | API Keys for integrations | ✅ |
+| Swagger / OpenAPI docs (`/api/docs`, `/api/docs-json`) | ✅ |
 | Invite links | ✅ |
-| Export to CSV | ✅ |
+| Export (CSV/JSON/JSONL) + Import (CSV/JSON/JSONL, dedupe, dry-run) + Bulk API | ✅ |
 | Webhooks | ✅ |
 | Admin panel (users/projects list, deactivate users) | ✅ |
 | Dark mode | ✅ |

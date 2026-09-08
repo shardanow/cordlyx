@@ -15,17 +15,24 @@ describe('EventsGateway', () => {
     gateway.server = mockServer as any;
   });
 
-  describe('handleJoinProject', () => {
-    it('should join project room', () => {
-      gateway.handleJoinProject(mockClient as any, 'proj-1');
+  describe('join/leave protocol', () => {
+    it('should join project and user rooms on join', () => {
+      const res = gateway.handleJoin(mockClient as any, { projectId: 'proj-1', userId: 'u-1' });
       expect(mockClient.join).toHaveBeenCalledWith('proj-1');
+      expect(mockClient.join).toHaveBeenCalledWith('user:u-1');
+      expect(res).toEqual({ event: 'joined', data: { projectId: 'proj-1', userId: 'u-1' } });
     });
-  });
 
-  describe('handleLeaveProject', () => {
-    it('should leave project room', () => {
-      gateway.handleLeaveProject(mockClient as any, 'proj-1');
+    it('should join only the project room when userId is missing', () => {
+      gateway.handleJoin(mockClient as any, { projectId: 'proj-1', userId: undefined } as any);
+      expect(mockClient.join).toHaveBeenCalledWith('proj-1');
+      expect(mockClient.join).toHaveBeenCalledTimes(1);
+    });
+
+    it('should leave project room on leave', () => {
+      const res = gateway.handleLeave(mockClient as any, { projectId: 'proj-1' });
       expect(mockClient.leave).toHaveBeenCalledWith('proj-1');
+      expect(res).toEqual({ event: 'left', data: { projectId: 'proj-1' } });
     });
   });
 

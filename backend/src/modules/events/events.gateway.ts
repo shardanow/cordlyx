@@ -36,16 +36,6 @@ export class EventsGateway implements OnGatewayInit, OnGatewayConnection, OnGate
     return { event: 'left', data: payload };
   }
 
-  handleJoinProject(client: Socket, projectId: string): void {
-    client.join(projectId);
-    this.logger.log(`Client joined project ${projectId}`);
-  }
-
-  handleLeaveProject(client: Socket, projectId: string): void {
-    client.leave(projectId);
-    this.logger.log(`Client left project ${projectId}`);
-  }
-
   @OnEvent('item.created')
   handleItemCreated(payload: any): void {
     this.emitEvent('item:created', payload);

@@ -11,7 +11,13 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-
 import { CSS } from '@dnd-kit/utilities';
 import QuickCreateModal from '@/components/QuickCreateModal';
 import { Select, SelectTrigger, SelectContent, SelectOption } from '@/components/ui/select';
-import { icons } from 'lucide-react';
+import { AvatarCircle } from '@/components/features/AvatarCircle';
+import { TypeIcon } from '@/components/features/TypeIcon';
+import { TypeBadge } from '@/components/features/TypeBadge';
+import { StatusDot } from '@/components/features/StatusDot';
+import { FilterBar } from '@/components/features/FilterBar';
+import { useProjectData } from '@/lib/project-data';
+import type { ItemType, ItemPriority, ProjectMember, Plan } from '@/lib/project-data';
 import {
   Search, Flag, User, Plus, MoreHorizontal, RotateCcw,
   CircleDot, ListTodo, Layout, Target,
@@ -38,52 +44,11 @@ interface BoardItem {
   tags?: { id: string; name: string; color: string | null }[];
 }
 
-interface ItemType {
-  id: string; name: string; color: string; icon: string | null;
-}
-
-interface ItemPriority {
-  id: string; name: string; color: string | null; icon: string | null;
-}
-
-interface MemberInfo {
-  id: string; userId: string; role: string; name: string; avatarUrl: string | null;
-}
-
-interface Project {
-  id: string; name: string; slug: string;
-}
-
-function kebabToPascal(str: string): string {
-  return str.split('-').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join('');
-}
-
-const ICON_ALIASES: Record<string, string> = {
-  'check-square': 'SquareCheckBig',
-};
-
-function TypeIcon({ name, className }: { name: string | null; className?: string }) {
-  if (!name) return null;
-  const m = icons as unknown as Record<string, React.ComponentType<{ className?: string }> | undefined>;
-  const key = ICON_ALIASES[name] ?? kebabToPascal(name);
-  const LucideIcon = m[key];
-  if (LucideIcon) return <LucideIcon className={className ?? 'w-4 h-4'} />;
-  return <span className="w-4 h-4 flex items-center justify-center text-xs">{name}</span>;
-}
-
-function AvatarCircle({ name, className }: { name: string; className?: string }) {
-  return (
-    <div className={`w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[9px] font-medium shrink-0 border border-border/60 ${className ?? ''}`}>
-      {name.charAt(0).toUpperCase()}
-    </div>
-  );
-}
-
 function SortableItem({
   item, priority, typeItem, assignee, plan, slug, statusColor,
 }: {
   item: BoardItem; priority: ItemPriority | undefined; typeItem: ItemType | undefined;
-  assignee: MemberInfo | undefined; plan: { id: string; name: string; color: string | null } | undefined; slug: string; statusColor?: string;
+  assignee: ProjectMember | undefined; plan: Plan | undefined; slug: string; statusColor?: string;
 }) {
   const router = useRouter();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -117,10 +82,7 @@ function SortableItem({
             ⠿
           </button>
           {typeItem && (
-            <span className="flex items-center gap-1.5 text-sm font-bold" style={{ color: typeItem.color ?? undefined }}>
-              <TypeIcon name={typeItem.icon ?? null} className="w-4 h-4 shrink-0" />
-              {typeItem.name}
-            </span>
+            <TypeBadge icon={typeItem.icon} color={typeItem.color} name={typeItem.name} />
           )}
         </div>
 
@@ -146,7 +108,7 @@ function SortableItem({
         )}
         {plan && (
           <div className="flex items-center gap-1.5 pb-0 px-4 mt-2">
-            <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: plan.color ?? '#6B7280' }} />
+            <StatusDot color={plan.color ?? '#6B7280'} className="w-2 h-2" />
             <span className="text-xs text-muted-foreground">{plan.name}</span>
           </div>
         )}
@@ -162,7 +124,7 @@ function SortableItem({
         <div className="flex items-center gap-1.5 min-w-0">
           {assignee ? (
             <>
-              <AvatarCircle name={assignee.name} />
+              <AvatarCircle name={assignee.name} avatarUrl={assignee.avatarUrl} size="xs" />
               <span className="truncate text-xs font-semibold">{assignee.name}</span>
             </>
           ) : (
@@ -236,36 +198,12 @@ export default function BoardPage() {
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
 
-  const { data: project } = useQuery<Project>({
-    queryKey: ['project', slug],
-    queryFn: () => api.get(`/projects/${slug}`),
-  });
-
   const { data: columns, isLoading } = useQuery<BoardColumn[]>({
     queryKey: ['board', slug],
     queryFn: () => api.get(`/projects/${slug}/board`),
   });
 
-  const { data: priorities } = useQuery<ItemPriority[]>({
-    queryKey: ['priorities', slug],
-    queryFn: () => api.get(`/projects/${slug}/priorities`),
-  });
-
-  const { data: types } = useQuery<ItemType[]>({
-    queryKey: ['types', slug],
-    queryFn: () => api.get(`/projects/${slug}/types`),
-  });
-
-  const { data: members } = useQuery<MemberInfo[]>({
-    queryKey: ['members', slug],
-    queryFn: () => api.get(`/projects/${slug}/members`),
-  });
-
-  interface Plan { id: string; name: string; color: string | null; }
-  const { data: plans } = useQuery<Plan[]>({
-    queryKey: ['plans', slug],
-    queryFn: () => api.get(`/projects/${slug}/plans`),
-  });
+  const { project, types, priorities, members, plans } = useProjectData(slug);
 
   const hasFilters = debouncedSearch || filterType || filterPriority || filterAssignee || filterPlan;
 
@@ -337,9 +275,8 @@ export default function BoardPage() {
     if (!targetStatusId || targetStatusId === activeItem.statusId) return;
 
     try {
-      await api.patch(`/projects/${slug}/items/${activeItem.id}`, {
+      await api.patch(`/projects/${slug}/board/${activeItem.id}`, {
         statusId: targetStatusId,
-        sortOrder: Date.now(),
       });
       queryClient.invalidateQueries({ queryKey: ['board', slug] });
       queryClient.invalidateQueries({ queryKey: ['items', slug] });
@@ -399,120 +336,58 @@ export default function BoardPage() {
 
       {/* Toolbar */}
       <div className="bg-card border border-border rounded-[14px] mb-5 md:mb-6">
-        <div className="flex items-center gap-2.5 p-3 overflow-x-auto">
-          <label className="h-[50px] w-[220px] shrink-0 flex items-center gap-2.5 px-3.5 rounded-[10px] border border-border bg-muted/50 cursor-text transition-colors focus-within:ring-1 focus-within:ring-ring">
-            <Search className="w-4 h-4 text-muted-foreground shrink-0" />
-            <input
-              type="text"
-              placeholder="Search items..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none border-0 min-w-0"
-            />
-            {debouncedSearch && (
-              <button onClick={() => { setSearch(''); setDebouncedSearch(''); }} className="text-muted-foreground hover:text-foreground shrink-0">✕</button>
-            )}
-          </label>
+        <FilterBar
+          values={{ search, debouncedSearch, typeId: filterType, statusId: '', priorityId: filterPriority, assigneeId: filterAssignee, planId: filterPlan }}
+          onSearch={setSearch}
+          onClearSearch={() => { setSearch(''); setDebouncedSearch(''); }}
+          onChange={(patch) => {
+            if (patch.typeId !== undefined) setFilterType(patch.typeId);
+            if (patch.priorityId !== undefined) setFilterPriority(patch.priorityId);
+            if (patch.assigneeId !== undefined) setFilterAssignee(patch.assigneeId);
+            if (patch.planId !== undefined) setFilterPlan(patch.planId);
+          }}
+          data={{ types, statuses: [], priorities, members, plans }}
+          showStatus={false}
+          layout="row"
+          trailing={
+            <>
+              <div className="flex-1 min-w-4" />
 
-          <Select value={filterType} onChange={setFilterType}>
-            <SelectTrigger className="h-[50px] shrink-0 min-w-[150px] inline-flex items-center gap-2.5 px-3.5 rounded-[10px] text-sm border border-border bg-muted/50">
-              <ListTodo className="w-4 h-4 shrink-0" />
-              <span className="truncate">{filterType ? types?.find((t) => t.id === filterType)?.name ?? 'All' : 'Type: All'}</span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectOption value=""><ListTodo className="w-4 h-4" />All types</SelectOption>
-              {(types ?? []).map((t) => (
-                <SelectOption key={t.id} value={t.id}>
-                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
-                  {t.name}
-                </SelectOption>
-              ))}
-            </SelectContent>
-          </Select>
+              {/* Columns visibility */}
+              <Select value="" onChange={() => { }}>
+                <SelectTrigger className="h-[50px] shrink-0 inline-flex items-center gap-2.5 px-3.5 rounded-[10px] text-sm border border-border bg-muted/50">
+                  <Layout className="w-4 h-4 shrink-0" />
+                  <span>Columns</span>
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredColumns.map((col) => (
+                    <button
+                      key={col.id}
+                      onClick={(e) => { e.stopPropagation(); toggleColumn(col.id); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors hover:bg-muted"
+                    >
+                      <span className="w-4 h-4 rounded border border-muted-foreground flex items-center justify-center shrink-0">
+                        {!hiddenColumns.has(col.id) && <span className="text-primary text-[10px] font-bold">✓</span>}
+                      </span>
+                      <StatusDot color={col.color} />
+                      {col.name}
+                    </button>
+                  ))}
+                </SelectContent>
+              </Select>
 
-          <Select value={filterPriority} onChange={setFilterPriority}>
-            <SelectTrigger className="h-[50px] shrink-0 min-w-[150px] inline-flex items-center gap-2.5 px-3.5 rounded-[10px] text-sm border border-border bg-muted/50">
-              <Flag className="w-4 h-4 shrink-0" />
-              <span className="truncate">{filterPriority ? priorities?.find((p) => p.id === filterPriority)?.name ?? 'All' : 'Priority: All'}</span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectOption value=""><Flag className="w-4 h-4" />All priorities</SelectOption>
-              {(priorities ?? []).map((p) => (
-                <SelectOption key={p.id} value={p.id}>
-                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color ?? '#888' }} />
-                  {p.name}
-                </SelectOption>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={filterAssignee} onChange={setFilterAssignee}>
-            <SelectTrigger className="h-[50px] shrink-0 min-w-[150px] inline-flex items-center gap-2.5 px-3.5 rounded-[10px] text-sm border border-border bg-muted/50">
-              <User className="w-4 h-4 shrink-0" />
-              <span className="truncate">{filterAssignee ? members?.find((m) => m.userId === filterAssignee)?.name ?? 'All' : 'Assignee: All'}</span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectOption value=""><User className="w-4 h-4" />All assignees</SelectOption>
-              {(members ?? []).map((m) => (
-                <SelectOption key={m.userId} value={m.userId}>
-                  <AvatarCircle name={m.name} />
-                  {m.name}
-                </SelectOption>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={filterPlan} onChange={setFilterPlan}>
-            <SelectTrigger className="h-[50px] shrink-0 min-w-[150px] inline-flex items-center gap-2.5 px-3.5 rounded-[10px] text-sm border border-border bg-muted/50">
-              <Target className="w-4 h-4 shrink-0" />
-              <span className="truncate">{filterPlan ? plans?.find((p) => p.id === filterPlan)?.name ?? 'All' : 'Plan: All'}</span>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectOption value=""><Target className="w-4 h-4" />All plans</SelectOption>
-              {(plans ?? []).map((p) => (
-                <SelectOption key={p.id} value={p.id}>
-                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color ?? '#6B7280' }} />
-                  {p.name}
-                </SelectOption>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <div className="flex-1 min-w-4" />
-
-          {/* Columns visibility */}
-          <Select value="" onChange={() => { }}>
-            <SelectTrigger className="h-[50px] shrink-0 inline-flex items-center gap-2.5 px-3.5 rounded-[10px] text-sm border border-border bg-muted/50">
-              <Layout className="w-4 h-4 shrink-0" />
-              <span>Columns</span>
-            </SelectTrigger>
-            <SelectContent>
-              {filteredColumns.map((col) => (
+              {hasFilters && (
                 <button
-                  key={col.id}
-                  onClick={(e) => { e.stopPropagation(); toggleColumn(col.id); }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors hover:bg-muted"
+                  onClick={clearFilters}
+                  className="h-[48px] inline-flex items-center gap-1.5 px-3 rounded-[10px] text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors shrink-0"
                 >
-                  <span className="w-4 h-4 rounded border border-muted-foreground flex items-center justify-center shrink-0">
-                    {!hiddenColumns.has(col.id) && <span className="text-primary text-[10px] font-bold">✓</span>}
-                  </span>
-                  <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: col.color }} />
-                  {col.name}
+                  <RotateCcw className="w-4 h-4 shrink-0" />
+                  <span>Reset</span>
                 </button>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {hasFilters && (
-            <button
-              onClick={clearFilters}
-              className="h-[48px] inline-flex items-center gap-1.5 px-3 rounded-[10px] text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors shrink-0"
-            >
-              <RotateCcw className="w-4 h-4 shrink-0" />
-              <span>Reset</span>
-            </button>
-          )}
-        </div>
+              )}
+            </>
+          }
+        />
       </div>
 
       {/* Board */}
@@ -524,7 +399,7 @@ export default function BoardPage() {
                 <DroppableColumn column={column}>
                   {/* Column header */}
                   <div className="flex items-center gap-1.5 px-1 pb-4">
-                    <div className="w-3 h-3 rounded-full shrink-0 shadow-[0_0_0_4px_rgba(255,255,255,0.03)]" style={{ backgroundColor: column.color }} />
+                    <StatusDot color={column.color} className="w-3 h-3 shadow-[0_0_0_4px_rgba(255,255,255,0.03)]" />
                     <span className="text-lg font-[850] truncate">{column.name}</span>
                     <span className="h-[22px] px-1.5 rounded-full bg-muted/30 text-muted-foreground text-xs font-[850] inline-flex items-center justify-center">{column.items.length}</span>
                   </div>
@@ -607,7 +482,7 @@ export default function BoardPage() {
                   <div className="flex items-center gap-1.5 min-w-0">
                     {activeAssignee ? (
                       <>
-                        <AvatarCircle name={activeAssignee.name} />
+                        <AvatarCircle name={activeAssignee.name} avatarUrl={activeAssignee.avatarUrl} size="xs" />
                         <span className="truncate text-xs font-semibold">{activeAssignee.name}</span>
                       </>
                     ) : (

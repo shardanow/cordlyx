@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { getDb } from '../../database/client.js';
+import { getDb, type DbClient } from '../../database/client.js';
 import { roadmaps } from '../../database/schema/roadmaps.js';
 import { roadmapLanes } from '../../database/schema/roadmap-lanes.js';
 import { roadmapItems } from '../../database/schema/roadmap-items.js';
@@ -258,8 +258,30 @@ export class RoadmapsService {
 
   // --- Lane CRUD ---
 
-  async createLane(roadmapId: string, data: { name: string; color?: string | null; sortOrder?: number }) {
+  private async assertLaneInRoadmap(roadmapId: string, laneId: string): Promise<void> {
     const db = getDb();
+    const [lane] = await db
+      .select({ id: roadmapLanes.id })
+      .from(roadmapLanes)
+      .where(and(eq(roadmapLanes.id, laneId), eq(roadmapLanes.roadmapId, roadmapId)))
+      .limit(1);
+    if (!lane) throw new NotFoundException('Lane not found in this roadmap');
+  }
+
+  private async assertItemInProject(projectId: string, itemId: string): Promise<void> {
+    const db = getDb();
+    const [item] = await db
+      .select({ id: items.id })
+      .from(items)
+      .where(and(eq(items.id, itemId), eq(items.projectId, projectId), isNull(items.deletedAt)))
+      .limit(1);
+    if (!item) throw new NotFoundException('Item not found in this project');
+  }
+
+  async createLane(roadmapId: string, projectId: string, data: { name: string; color?: string | null; sortOrder?: number }) {
+    const db = getDb();
+    const roadmap = await this.getById(projectId, roadmapId);
+    if (!roadmap) throw new NotFoundException('Roadmap not found');
     const [lane] = await db
       .insert(roadmapLanes)
       .values({
@@ -272,8 +294,9 @@ export class RoadmapsService {
     return lane;
   }
 
-  async updateLane(laneId: string, data: { name?: string; icon?: string | null; color?: string | null; sortOrder?: number }) {
+  async updateLane(projectId: string, laneId: string, data: { name?: string; icon?: string | null; color?: string | null; sortOrder?: number }) {
     const db = getDb();
+    await this.assertLaneInProject(projectId, laneId);
     const [updated] = await db
       .update(roadmapLanes)
       .set({ ...data, updatedAt: new Date() })
@@ -283,14 +306,9 @@ export class RoadmapsService {
     return updated;
   }
 
-  async deleteLane(laneId: string) {
+  async deleteLane(projectId: string, laneId: string) {
     const db = getDb();
-    const existing = await db
-      .select({ id: roadmapLanes.id })
-      .from(roadmapLanes)
-      .where(eq(roadmapLanes.id, laneId))
-      .limit(1);
-    if (!existing[0]) throw new NotFoundException('Lane not found');
+    await this.assertLaneInProject(projectId, laneId);
 
     // Remove lane reference from roadmap_items
     await db
@@ -304,6 +322,17 @@ export class RoadmapsService {
     return { success: true };
   }
 
+  private async assertLaneInProject(projectId: string, laneId: string): Promise<void> {
+    const db = getDb();
+    const [lane] = await db
+      .select({ id: roadmapLanes.id })
+      .from(roadmapLanes)
+      .innerJoin(roadmaps, eq(roadmapLanes.roadmapId, roadmaps.id))
+      .where(and(eq(roadmapLanes.id, laneId), eq(roadmaps.projectId, projectId)))
+      .limit(1);
+    if (!lane) throw new NotFoundException('Lane not found in this project');
+  }
+
   // --- Scheduling ---
 
   async scheduleItems(
@@ -314,6 +343,20 @@ export class RoadmapsService {
     const db = getDb();
     const existing = await this.getById(projectId, roadmapId);
     if (!existing) throw new NotFoundException('Roadmap not found');
+
+    // Every scheduled item must belong to this project.
+    if (data.itemIds.length > 0) {
+      const owned = await db
+        .select({ id: items.id })
+        .from(items)
+        .where(and(eq(items.projectId, projectId), isNull(items.deletedAt), inArray(items.id, data.itemIds)));
+      if (owned.length !== new Set(data.itemIds).size) {
+        throw new NotFoundException('One or more items not found in this project');
+      }
+    }
+    if (data.laneId) {
+      await this.assertLaneInRoadmap(roadmapId, data.laneId);
+    }
 
     const now = new Date();
     const values = data.itemIds.map((itemId) => ({
@@ -326,27 +369,75 @@ export class RoadmapsService {
       createdAt: now,
     }));
 
-    // Upsert: insert or update on conflict (roadmap_id, item_id)
-    for (const val of values) {
-      await db
-        .insert(roadmapItems)
-        .values(val)
-        .onConflictDoUpdate({
-          target: [roadmapItems.roadmapId, roadmapItems.itemId],
-          set: {
-            laneId: val.laneId,
-            startDate: val.startDate,
-            dueDate: val.dueDate,
-            sortOrder: val.sortOrder,
-          },
-        });
-    }
+    // Upsert: insert or update on conflict (roadmap_id, item_id).
+    // Atomic: a mid-loop failure never leaves a half-scheduled batch.
+    await getDb().transaction(async (txx) => {
+      const tx = txx as unknown as DbClient;
+      for (const val of values) {
+        await tx
+          .insert(roadmapItems)
+          .values(val)
+          .onConflictDoUpdate({
+            target: [roadmapItems.roadmapId, roadmapItems.itemId],
+            set: {
+              laneId: val.laneId,
+              startDate: val.startDate,
+              dueDate: val.dueDate,
+              sortOrder: val.sortOrder,
+            },
+          });
+      }
+    });
 
     return this.getRoadmapWithItems(projectId, roadmapId);
   }
 
+  /**
+   * Reorder lanes atomically: validates the full set first, then applies
+   * all sortOrders in one transaction (replaces client-side pairwise swaps).
+   */
+  async reorderLanes(projectId: string, roadmapId: string, laneIds: string[]) {
+    const db = getDb();
+    const existing = await this.getById(projectId, roadmapId);
+    if (!existing) throw new NotFoundException('Roadmap not found');
+
+    const current = await db
+      .select({ id: roadmapLanes.id })
+      .from(roadmapLanes)
+      .where(eq(roadmapLanes.roadmapId, roadmapId));
+    const currentIds = new Set(current.map((l) => l.id));
+    const seen = new Set<string>();
+    for (const id of laneIds) {
+      if (seen.has(id) || !currentIds.has(id)) {
+        throw new BadRequestException('laneIds must match the roadmap lanes exactly once each');
+      }
+      seen.add(id);
+    }
+    if (seen.size !== currentIds.size) {
+      throw new BadRequestException('laneIds must match the roadmap lanes exactly once each');
+    }
+
+    await db.transaction(async (txx) => {
+      const tx = txx as unknown as DbClient;
+      let order = 0;
+      for (const id of laneIds) {
+        order += 1;
+        await tx.update(roadmapLanes).set({ sortOrder: order }).where(eq(roadmapLanes.id, id));
+      }
+    });
+
+    return db
+      .select()
+      .from(roadmapLanes)
+      .where(eq(roadmapLanes.roadmapId, roadmapId))
+      .orderBy(roadmapLanes.sortOrder);
+  }
+
   async unscheduleItem(projectId: string, roadmapId: string, itemId: string) {
     const db = getDb();
+    const existing = await this.getById(projectId, roadmapId);
+    if (!existing) throw new NotFoundException('Roadmap not found');
+    await this.assertItemInProject(projectId, itemId);
     await db
       .delete(roadmapItems)
       .where(
@@ -365,6 +456,12 @@ export class RoadmapsService {
     data: { startDate?: string | null; dueDate?: string | null; laneId?: string | null; roadmapId?: string },
   ) {
     const db = getDb();
+    const existing = await this.getById(projectId, roadmapId);
+    if (!existing) throw new NotFoundException('Roadmap not found');
+    await this.assertItemInProject(projectId, itemId);
+    if (data.laneId) {
+      await this.assertLaneInRoadmap(roadmapId, data.laneId);
+    }
     const updateData: Record<string, unknown> = {};
     if (data.startDate !== undefined) updateData.startDate = data.startDate ? new Date(data.startDate) : null;
     if (data.dueDate !== undefined) updateData.dueDate = data.dueDate ? new Date(data.dueDate) : null;

@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { toast } from 'sonner';
 import RichEditor from '@/components/RichEditor';
 import ImagePreviewModal from '@/components/ImagePreviewModal';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import ReactionBar from '@/components/ReactionBar';
 import Spinner from '@/components/Spinner';
 import {
@@ -16,27 +17,17 @@ import {
   CircleDot, Flag, User, UserPlus, Calendar, Clock,
   Pencil, Tags, Link2, Paperclip, MessageSquare,
 } from 'lucide-react';
-import { icons, Target, Copy, ChevronUp } from 'lucide-react';
+import { Target, Copy, ChevronUp } from 'lucide-react';
 import { Select, SelectTrigger, SelectContent, SelectOption } from '@/components/ui/select';
-
-interface ItemType {
-  id: string; name: string; color: string; icon: string | null;
-}
-
-interface ItemStatus {
-  id: string; name: string; color: string; category: string;
-}
-
-interface ItemPriority {
-  id: string; name: string; color: string | null; icon: string | null;
-}
+import { AvatarCircle } from '@/components/features/AvatarCircle';
+import { Avatar } from '@/components/ui/avatar';
+import { TypeIcon } from '@/components/features/TypeIcon';
+import { StatusDot } from '@/components/features/StatusDot';
+import { AssigneePicker } from '@/components/features/AssigneePicker';
+import { useProjectData } from '@/lib/project-data';
 
 interface Tag {
   id: string; name: string; color: string | null;
-}
-
-interface ProjectMember {
-  id: string; userId: string; role: string; name: string; email: string; avatarUrl: string | null; joinedAt: string;
 }
 
 interface ItemDetail {
@@ -142,31 +133,6 @@ function renderMarkdown(text: string): string {
     .replace(/$/, '</p>');
 }
 
-function kebabToPascal(str: string): string {
-  return str.split('-').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join('');
-}
-
-const ICON_ALIASES: Record<string, string> = {
-  'check-square': 'SquareCheckBig',
-};
-
-function TypeIcon({ name, className }: { name: string | null; className?: string }) {
-  if (!name) return null;
-  const m = icons as unknown as Record<string, React.ComponentType<{ className?: string }> | undefined>;
-  const key = ICON_ALIASES[name] ?? kebabToPascal(name);
-  const LucideIcon = m[key];
-  if (LucideIcon) return <LucideIcon className={className ?? 'w-4 h-4'} />;
-  return <span className="w-4 h-4 flex items-center justify-center text-xs">{name}</span>;
-}
-
-function AvatarCircle({ name, className }: { name: string; className?: string }) {
-  return (
-    <div className={`w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium shrink-0 overflow-hidden ${className ?? ''}`}>
-      {name.charAt(0).toUpperCase()}
-    </div>
-  );
-}
-
 export default function ItemDetailPage() {
   const { slug, seq } = useParams<{ slug: string; seq: string }>();
   const queryClient = useQueryClient();
@@ -195,6 +161,7 @@ export default function ItemDetailPage() {
   const [tagInput, setTagInput] = useState('');
   const [tagSuggestions, setTagSuggestions] = useState<Tag[]>([]);
   const [showAllMeta, setShowAllMeta] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const { data: item, isLoading } = useQuery<ItemDetail>({
     queryKey: ['item', slug, seq],
@@ -213,40 +180,11 @@ export default function ItemDetailPage() {
     setVoted(votesData.voters.includes(currentUser?.id ?? ''));
   }, [votesData, currentUser]);
 
-  const { data: project } = useQuery<{ id: string; name: string; slug: string }>({
-    queryKey: ['project', slug],
-    queryFn: () => api.get(`/projects/${slug}`),
-  });
-
-  const { data: types } = useQuery<ItemType[]>({
-    queryKey: ['types', slug],
-    queryFn: () => api.get(`/projects/${slug}/types`),
-  });
-
-  const { data: statuses } = useQuery<ItemStatus[]>({
-    queryKey: ['statuses', slug],
-    queryFn: () => api.get(`/projects/${slug}/statuses`),
-  });
-
-  const { data: priorities } = useQuery<ItemPriority[]>({
-    queryKey: ['priorities', slug],
-    queryFn: () => api.get(`/projects/${slug}/priorities`),
-  });
-
-  const { data: members } = useQuery<ProjectMember[]>({
-    queryKey: ['members', slug],
-    queryFn: () => api.get(`/projects/${slug}/members`),
-  });
+  const { project, types, statuses, priorities, members, plans } = useProjectData(slug);
 
   const { data: projectTags } = useQuery<Tag[]>({
     queryKey: ['tags', slug],
     queryFn: () => api.get(`/projects/${slug}/tags`),
-  });
-
-  interface Plan { id: string; name: string; type: string; color: string | null; }
-  const { data: plans } = useQuery<Plan[]>({
-    queryKey: ['plans', slug],
-    queryFn: () => api.get(`/projects/${slug}/plans`),
   });
 
   const { data: comments, isLoading: commentsLoading } = useQuery<Comment[]>({
@@ -362,7 +300,6 @@ export default function ItemDetailPage() {
 
   const handleDelete = async () => {
     if (!item) return;
-    if (!window.confirm('Are you sure you want to delete this item?')) return;
     try {
       await api.delete(`/projects/${slug}/items/${item.id}`);
       queryClient.invalidateQueries({ queryKey: ['items', slug] });
@@ -371,6 +308,8 @@ export default function ItemDetailPage() {
       router.push(`/projects/${slug}`);
     } catch {
       toast.error('Failed to delete item');
+    } finally {
+      setConfirmDelete(false);
     }
   };
 
@@ -541,7 +480,7 @@ export default function ItemDetailPage() {
           <span className="text-foreground truncate">{item.title}</span>
         </div>
         <button
-          onClick={handleDelete}
+          onClick={() => setConfirmDelete(true)}
           className="ml-auto w-9 h-9 grid place-items-center border border-destructive/20 rounded-lg text-destructive/70 hover:text-destructive hover:bg-destructive/5 transition-colors shrink-0"
           aria-label="Delete item"
         >
@@ -615,13 +554,13 @@ export default function ItemDetailPage() {
             <span className="text-xs md:text-sm font-semibold text-muted-foreground">Status</span>
             <Select value={item.statusId} onChange={(v) => handleFieldUpdate('statusId', v)}>
               <SelectTrigger>
-                {status?.color && <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: status.color }} />}
+                {status?.color && <StatusDot color={status.color} />}
                 {status?.name ?? 'Select'}
               </SelectTrigger>
               <SelectContent>
                 {(statuses ?? []).map((s) => (
                   <SelectOption key={s.id} value={s.id}>
-                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                    <StatusDot color={s.color} />
                     {s.name}
                   </SelectOption>
                 ))}
@@ -637,13 +576,13 @@ export default function ItemDetailPage() {
             <span className="text-xs md:text-sm font-semibold text-muted-foreground">Priority</span>
             <Select value={item.priorityId} onChange={(v) => handleFieldUpdate('priorityId', v)}>
               <SelectTrigger>
-                {priority?.color && <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: priority.color }} />}
+                {priority?.color && <StatusDot color={priority.color} />}
                 {priority?.name ?? 'Select'}
               </SelectTrigger>
               <SelectContent>
                 {(priorities ?? []).map((p) => (
                   <SelectOption key={p.id} value={p.id}>
-                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color ?? '#888' }} />
+                    <StatusDot color={p.color ?? '#888'} />
                     {p.name}
                   </SelectOption>
                 ))}
@@ -657,24 +596,11 @@ export default function ItemDetailPage() {
           <div className="flex items-center gap-2 shrink-0">
             <User className="w-4 h-4 text-muted-foreground" />
             <span className="text-xs md:text-sm font-semibold text-muted-foreground">Assignee</span>
-            <Select value={item.assigneeId ?? ''} onChange={(v) => handleFieldUpdate('assigneeId', v || null)}>
-              <SelectTrigger>
-                {assignee ? <AvatarCircle name={assignee.name} /> : <User className="w-3.5 h-3.5 text-muted-foreground" />}
-                {assignee?.name ?? 'Unassigned'}
-              </SelectTrigger>
-              <SelectContent>
-                <SelectOption value="">
-                  <User className="w-3.5 h-3.5 text-muted-foreground" />
-                  Unassigned
-                </SelectOption>
-                {(members ?? []).map((m) => (
-                  <SelectOption key={m.userId} value={m.userId}>
-                    <AvatarCircle name={m.name} />
-                    {m.name}
-                  </SelectOption>
-                ))}
-              </SelectContent>
-            </Select>
+            <AssigneePicker
+              value={item.assigneeId ?? ''}
+              members={members}
+              onChange={(v) => handleFieldUpdate('assigneeId', v || null)}
+            />
           </div>
 
           <div className="w-px h-5 bg-border shrink-0 hidden sm:block" />
@@ -683,9 +609,9 @@ export default function ItemDetailPage() {
           <div className="flex items-center gap-2 shrink-0">
             <UserPlus className="w-4 h-4 text-muted-foreground" />
             <span className="text-xs md:text-sm font-semibold text-muted-foreground">Reporter</span>
-            {reporter ? (
+              {reporter ? (
               <span className="inline-flex items-center gap-1.5 text-sm">
-                <AvatarCircle name={reporter.name} />
+                <AvatarCircle name={reporter.name} avatarUrl={reporter.avatarUrl} className="w-7 h-7 text-xs" />
                 {reporter.name}
               </span>
             ) : (
@@ -701,13 +627,13 @@ export default function ItemDetailPage() {
             <span className="text-xs md:text-sm font-semibold text-muted-foreground">Plan</span>
             <Select value={item.planId ?? ''} onChange={(v) => handleFieldUpdate('planId', v || null)}>
               <SelectTrigger>
-                {plan ? <><div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: plan.color ?? '#6B7280' }} />{plan.name}</> : <span className="text-muted-foreground">No plan</span>}
+                {plan ? <><StatusDot color={plan.color ?? '#6B7280'} className="w-2 h-2" />{plan.name}</> : <span className="text-muted-foreground">No plan</span>}
               </SelectTrigger>
               <SelectContent>
                 <SelectOption value=""><Target className="w-3.5 h-3.5 text-muted-foreground" />No plan</SelectOption>
                 {(plans ?? []).map((p) => (
                   <SelectOption key={p.id} value={p.id}>
-                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color ?? '#6B7280' }} />
+                    <StatusDot color={p.color ?? '#6B7280'} />
                     {p.name}
                   </SelectOption>
                 ))}
@@ -924,7 +850,7 @@ export default function ItemDetailPage() {
                         onClick={() => { handleTagToggle(t); setTagInput(''); setTagSuggestions([]); setTagCreateOpen(false); }}
                         className="w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition flex items-center gap-2"
                       >
-                        <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: t.color ?? '#3B82F6' }} />
+                        <StatusDot color={t.color ?? '#3B82F6'} className="w-2 h-2" />
                         {t.name}
                       </button>
                     ))}
@@ -1169,13 +1095,7 @@ export default function ItemDetailPage() {
                 const isReplying = replyToId === c.id;
                 return (
                 <div key={c.id} className={`flex gap-3 px-0 py-3.5 border-t border-border/10 ${isReply ? 'ml-9 pl-4 border-l-2 border-border/20' : ''}`}>
-                  <div className={`rounded-full bg-muted flex items-center justify-center text-xs font-medium shrink-0 overflow-hidden ${isReply ? 'w-6 h-6 text-[9px]' : 'w-8 h-8'}`}>
-                    {c.author?.avatarUrl ? (
-                      <img src={c.author.avatarUrl} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      c.author?.name?.charAt(0) ?? '?'
-                    )}
-                  </div>
+                  <Avatar src={c.author?.avatarUrl ?? null} name={c.author?.name ?? '?'} size={isReply ? 'xs' : 'md'} className={isReply ? 'w-6 h-6 text-[9px]' : 'w-8 h-8'} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2.5 mb-1">
                       <span className="text-sm font-bold text-foreground">{c.author?.name ?? 'Unknown'}</span>
@@ -1325,6 +1245,14 @@ export default function ItemDetailPage() {
       {previewImage && (
         <ImagePreviewModal src={previewImage} onClose={() => setPreviewImage(null)} />
       )}
+      <ConfirmModal
+        open={confirmDelete}
+        title="Delete this item?"
+        message="This will permanently remove the item and its attachments."
+        confirmLabel="Delete"
+        onConfirm={() => void handleDelete()}
+        onClose={() => setConfirmDelete(false)}
+      />
     </div>
   );
 }

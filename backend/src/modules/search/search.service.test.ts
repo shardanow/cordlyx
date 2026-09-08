@@ -15,13 +15,14 @@ describe('SearchService', () => {
   let searchService: SearchService;
   let projectId: string;
   let projectSlug: string;
+  let userId: string;
 
   beforeAll(async () => {
     searchService = new SearchService();
     const db = getDb();
     await db.execute(sql`TRUNCATE users CASCADE`);
 
-    const userId = randomUUID();
+    userId = randomUUID();
     await db.insert(users).values({
       id: userId,
       email: 'search-test@test.com',
@@ -91,37 +92,46 @@ const titles = [
   });
 
   it('should find items matching search query', async () => {
-    const result = await searchService.search('login', projectId);
+    const result = await searchService.search('login', userId, projectId);
     expect(result.data.length).toBeGreaterThanOrEqual(1);
     expect(result.data[0]!.title.toLowerCase()).toContain('login');
   });
 
   it('should return empty for no matches', async () => {
-    const result = await searchService.search('zzzzzznonexistent', projectId);
+    const result = await searchService.search('zzzzzznonexistent', userId, projectId);
     expect(result.data).toEqual([]);
   });
 
   it('should include project slug and name', async () => {
-    const result = await searchService.search('login', projectId);
+    const result = await searchService.search('login', userId, projectId);
     expect(result.data[0]!.projectSlug).toBe(projectSlug);
     expect(result.data[0]!.projectName).toBe('Search Test Project');
   });
 
-  it('should search across all projects when no projectId', async () => {
-    const result = await searchService.search('login');
+  it('should search member projects when no projectId', async () => {
+    const result = await searchService.search('login', userId);
     expect(result.data.length).toBeGreaterThanOrEqual(1);
   });
 
+  it('should reject a project the user is not a member of', async () => {
+    await expect(searchService.search('login', userId, randomUUID())).rejects.toThrow(/not a member/);
+  });
+
+  it('should return nothing for users with no memberships', async () => {
+    const result = await searchService.search('login', randomUUID());
+    expect(result.data).toEqual([]);
+  });
+
   it('should paginate results', async () => {
-    const firstPage = await searchService.search('login', projectId, { limit: 1 });
+    const firstPage = await searchService.search('login', userId, projectId, { limit: 1 });
     expect(firstPage.data.length).toBe(1);
     expect(firstPage.meta.cursor).not.toBeNull();
   });
 
   it('should support cursor-based pagination', async () => {
-    const page1 = await searchService.search('login', projectId, { limit: 1 });
+    const page1 = await searchService.search('login', userId, projectId, { limit: 1 });
     if (page1.meta.cursor) {
-      const page2 = await searchService.search('login', projectId, { cursor: page1.meta.cursor, limit: 1 });
+      const page2 = await searchService.search('login', userId, projectId, { cursor: page1.meta.cursor, limit: 1 });
       expect(page2.data.length).toBeGreaterThanOrEqual(1);
       // Verify no overlap
       const ids1 = page1.data.map((i) => i.id);
@@ -135,20 +145,20 @@ const titles = [
   it('should return empty when cursor is past end', async () => {
     const epoch = new Date(0).toISOString();
     const pastCursor = Buffer.from(`${epoch}|00000000-0000-0000-0000-000000000000`).toString('base64');
-    const result = await searchService.search('login', projectId, { cursor: pastCursor, limit: 10 });
+    const result = await searchService.search('login', userId, projectId, { cursor: pastCursor, limit: 10 });
     expect(result.data).toEqual([]);
     expect(result.meta.hasMore).toBe(false);
     expect(result.meta.cursor).toBeNull();
   });
 
   it('should handle empty search query gracefully', async () => {
-    const result = await searchService.search('', projectId);
+    const result = await searchService.search('', userId, projectId);
     // empty query returns empty — plainto_tsquery('english', '') returns nothing
     expect(result.data).toEqual([]);
   });
 
   it('should handle special characters in search query', async () => {
-    const result = await searchService.search('login & | ! @ # $ % ^ * ( )', projectId);
+    const result = await searchService.search('login & | ! @ # $ % ^ * ( )', userId, projectId);
     // Should not crash; may or may not find results but must not throw
     expect(Array.isArray(result.data)).toBe(true);
     expect(result.meta).toHaveProperty('hasMore');

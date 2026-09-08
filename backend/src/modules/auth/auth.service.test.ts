@@ -101,5 +101,24 @@ describe('AuthService', () => {
         authService.refresh('invalid-token'),
       ).rejects.toThrow('Invalid or expired refresh token');
     });
+
+    it('should reject an access token used as refresh token', async () => {
+      const { accessToken } = await authService.login('testuser', 'password123');
+      await expect(authService.refresh(accessToken)).rejects.toThrow('Invalid or expired refresh token');
+    });
+  });
+
+  describe('logout', () => {
+    it('should revoke the refresh token', async () => {
+      const { refreshToken } = await authService.login('testuser', 'password123');
+      const payload = JSON.parse(Buffer.from(refreshToken.split('.')[1]!, 'base64').toString());
+      await authService.logout(payload.sub, refreshToken);
+      await expect(authService.refresh(refreshToken)).rejects.toThrow('Invalid or expired refresh token');
+    });
+
+    it('should succeed with missing or garbage token', async () => {
+      await expect(authService.logout('any-user-id', null)).resolves.toEqual({ success: true });
+      await expect(authService.logout('any-user-id', 'garbage')).resolves.toEqual({ success: true });
+    });
   });
 });

@@ -1,11 +1,11 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Req } from '@nestjs/common';
 import { Request } from 'express';
-import { JwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole } from '../../common/index.js';
+import { ApiKeyOrJwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole } from '../../common/index.js';
 import { TagsService } from './tags.service.js';
 import { createTagSchema } from '@cordlyx/shared';
 
 @Controller('projects/:projectSlug/tags')
-@UseGuards(JwtAuthGuard, ProjectMembershipGuard)
+@UseGuards(ApiKeyOrJwtAuthGuard, ProjectMembershipGuard)
 export class TagsController {
   constructor(private readonly tagsService: TagsService) {}
 
@@ -25,15 +25,15 @@ export class TagsController {
   @Patch(':id')
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
-  async update(@Param('id') id: string, @Body() body: unknown) {
+  async update(@Req() req: Request, @Param('id') id: string, @Body() body: unknown) {
     const data = createTagSchema.partial().parse(body);
-    return this.tagsService.update(id, data);
+    return this.tagsService.update(req.projectId as string, id, data);
   }
 
   @Delete(':id')
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('admin')
-  async delete(@Param('id') id: string) {
-    return this.tagsService.delete(id);
+  async delete(@Req() req: Request, @Param('id') id: string) {
+    return this.tagsService.delete(req.projectId as string, id);
   }
 }

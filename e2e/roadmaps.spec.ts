@@ -31,14 +31,15 @@ test.describe('Roadmaps', () => {
     await page.getByRole('link', { name: /roadmaps/i }).click();
     await expect(page).toHaveURL(/\/roadmaps$/);
 
-    await page.getByRole('button', { name: /create roadmap/i }).click();
-    await page.getByPlaceholder(/name/i).fill('Q3 Release');
+    await page.getByRole('button', { name: /create roadmap/i }).first().click();
+    const roadmapName = `Q3 Release ${Date.now()}`;
+    await page.getByPlaceholder('Q3 2024 Release').fill(roadmapName);
     await page.locator('input[type="date"]').first().fill(TOMORROW);
     await page.locator('input[type="date"]').nth(1).fill(NEXT_WEEK);
     await page.getByRole('button', { name: /^Create$/ }).click();
     await page.waitForTimeout(700);
 
-    await expect(page.getByText('Q3 Release')).toBeVisible();
+    await expect(page.getByText(roadmapName)).toBeVisible();
   });
 
   test('should edit a roadmap name', async ({ page }) => {
@@ -52,21 +53,23 @@ test.describe('Roadmaps', () => {
     await page.getByRole('link', { name: /roadmaps/i }).click();
     await expect(page).toHaveURL(/\/roadmaps$/);
 
-    // Create
-    await page.getByRole('button', { name: /create roadmap/i }).click();
-    await page.getByPlaceholder(/name/i).fill('Edit Roadmap');
+    // Create (unique names: retries must not clash with attempt 1)
+    const editBase = `Edit Roadmap ${Date.now()}`;
+    const updatedName = `Updated Roadmap ${Date.now()}`;
+    await page.getByRole('button', { name: /create roadmap/i }).first().click();
+    await page.getByPlaceholder('Q3 2024 Release').fill(editBase);
     await page.locator('input[type="date"]').first().fill(TOMORROW);
     await page.locator('input[type="date"]').nth(1).fill(NEXT_WEEK);
     await page.getByRole('button', { name: /^Create$/ }).click();
     await page.waitForTimeout(700);
 
     // Click edit pencil
-    await page.getByRole('button', { title: /edit roadmap/i }).click();
-    await page.getByPlaceholder(/name/i).fill('Updated Roadmap');
-    await page.getByRole('button', { name: /save/i }).click();
+    await page.getByTitle(/edit roadmap/i).first().click();
+    await page.getByPlaceholder('Q3 2024 Release').fill(updatedName);
+    await page.getByRole('button', { name: 'Save' }).click();
     await page.waitForTimeout(700);
 
-    await expect(page.getByText('Updated Roadmap')).toBeVisible();
+    await expect(page.getByText(updatedName)).toBeVisible();
   });
 
   test('should delete a roadmap', async ({ page }) => {
@@ -80,19 +83,22 @@ test.describe('Roadmaps', () => {
     await page.getByRole('link', { name: /roadmaps/i }).click();
     await expect(page).toHaveURL(/\/roadmaps$/);
 
-    // Create
-    await page.getByRole('button', { name: /create roadmap/i }).click();
-    await page.getByPlaceholder(/name/i).fill('Delete Test');
+    // Create (unique name: retries must not clash with attempt 1)
+    const deleteName = `Delete Test ${Date.now()}`;
+    await page.getByRole('button', { name: /create roadmap/i }).first().click();
+    await page.getByPlaceholder('Q3 2024 Release').fill(deleteName);
     await page.locator('input[type="date"]').first().fill(TOMORROW);
     await page.locator('input[type="date"]').nth(1).fill(NEXT_WEEK);
     await page.getByRole('button', { name: /^Create$/ }).click();
     await page.waitForTimeout(700);
 
-    // Delete
-    page.on('dialog', (dialog) => dialog.accept());
-    await page.getByRole('button', { name: /^Delete$/ }).click();
-    await page.waitForTimeout(500);
+    // Delete (custom ConfirmModal, not a native dialog)
+    await page.getByRole('button', { name: /^Delete$/ }).first().click();
+    const confirm = page.getByRole('alertdialog');
+    await confirm.getByRole('button', { name: 'Delete' }).click();
+    // Confirm dialog closes only after a successful delete
+    await expect(confirm).not.toBeVisible({ timeout: 5000 });
 
-    await expect(page.getByText('Delete Test')).not.toBeVisible();
+    await expect(page.getByText(deleteName)).not.toBeVisible({ timeout: 5000 });
   });
 });

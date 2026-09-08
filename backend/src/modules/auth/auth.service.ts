@@ -4,7 +4,8 @@ import { randomUUID } from 'node:crypto';
 import bcrypt from 'bcrypt';
 import { getDb } from '../../database/client.js';
 import { users } from '../../database/schema/users.js';
-import { eq, or } from 'drizzle-orm';
+import { revokedRefreshTokens } from '../../database/schema/revoked-refresh-tokens.js';
+import { eq, or, lt } from 'drizzle-orm';
 
 @Injectable()
 export class AuthService {
@@ -50,17 +51,51 @@ export class AuthService {
   async refresh(refreshToken: string) {
     try {
       const payload = this.jwtService.verify(refreshToken);
-      // Fetch fresh isAdmin status from DB on refresh
+      if (payload.type !== 'refresh' || !payload.jti) {
+        throw new UnauthorizedException('Invalid or expired refresh token');
+      }
       const db = getDb();
+      const [revoked] = await db
+        .select({ jti: revokedRefreshTokens.jti })
+        .from(revokedRefreshTokens)
+        .where(eq(revokedRefreshTokens.jti, payload.jti))
+        .limit(1);
+      if (revoked) {
+        throw new UnauthorizedException('Invalid or expired refresh token');
+      }
+      // Fetch fresh isAdmin/isActive status from DB on refresh
       const result = await db
-        .select({ isAdmin: users.isAdmin })
+        .select({ isAdmin: users.isAdmin, isActive: users.isActive })
         .from(users)
         .where(eq(users.id, payload.sub))
         .limit(1);
+      if (!result[0]?.isActive) {
+        throw new UnauthorizedException('Invalid or expired refresh token');
+      }
       return this.generateTokens(payload.sub, payload.email, result[0]?.isAdmin ?? false);
-    } catch {
+    } catch (err) {
+      if (err instanceof UnauthorizedException) throw err;
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
+  }
+
+  async logout(userId: string, refreshToken?: string | null) {
+    const db = getDb();
+    // Opportunistically purge expired denylist rows.
+    await db.delete(revokedRefreshTokens).where(lt(revokedRefreshTokens.expiresAt, new Date())).catch(() => {});
+    if (!refreshToken) return { success: true };
+    try {
+      const payload = this.jwtService.verify(refreshToken, { ignoreExpiration: true });
+      if (payload.type !== 'refresh' || !payload.jti || payload.sub !== userId) return { success: true };
+      const expiresAt = payload.exp ? new Date(payload.exp * 1000) : new Date(Date.now() + 7 * 24 * 3600 * 1000);
+      await db
+        .insert(revokedRefreshTokens)
+        .values({ jti: payload.jti, userId, expiresAt })
+        .onConflictDoNothing();
+    } catch {
+      // Unverifiable token: nothing to revoke.
+    }
+    return { success: true };
   }
 
   async changePassword(userId: string, currentPassword: string, newPassword: string) {
@@ -85,15 +120,21 @@ export class AuthService {
   }
 
   private generateTokens(userId: string, email: string, isAdmin: boolean = false) {
-    const payload = { sub: userId, email, isAdmin };
+    const base = { sub: userId, email, isAdmin };
 
-    const accessToken = this.jwtService.sign(payload, {
-      expiresIn: (process.env.JWT_ACCESS_EXPIRES_IN ?? '15m') as any,
-    });
+    const accessToken = this.jwtService.sign(
+      { ...base, type: 'access' },
+      {
+        expiresIn: (process.env.JWT_ACCESS_EXPIRES_IN ?? '15m') as any,
+      },
+    );
 
-    const refreshToken = this.jwtService.sign(payload, {
-      expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN ?? '7d') as any,
-    });
+    const refreshToken = this.jwtService.sign(
+      { ...base, type: 'refresh', jti: randomUUID() },
+      {
+        expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN ?? '7d') as any,
+      },
+    );
 
     return { accessToken, refreshToken };
   }

@@ -9,6 +9,7 @@ interface JwtPayload {
   sub: string;
   email: string;
   isAdmin?: boolean;
+  type?: string;
 }
 
 @Injectable()
@@ -22,6 +23,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
+    // Refresh tokens must never authenticate API requests
+    // (missing type = issued before token typing, still accepted).
+    if (payload.type === 'refresh') {
+      throw new UnauthorizedException('Invalid token type');
+    }
     const db = getDb();
     const result = await db
       .select({ id: users.id, email: users.email, isAdmin: users.isAdmin })

@@ -32,7 +32,7 @@ describe('TagsController (unit)', () => {
 
   it('delete should return success', async () => {
     const controller = createController({ delete: async () => ({ success: true }) });
-    const result = await controller.delete('tag-1');
+    const result = await controller.delete(req, 'tag-1');
     expect(result).toEqual({ success: true });
   });
 
@@ -40,8 +40,8 @@ describe('TagsController (unit)', () => {
     const updated = { ...mockTag, name: 'feature', color: '#3b82f6' };
     const spy = vi.fn(async () => updated);
     const controller = createController({ update: spy });
-    const result = await controller.update('tag-1', { name: 'feature', color: '#3b82f6' } as any);
-    expect(spy).toHaveBeenCalledWith('tag-1', { name: 'feature', color: '#3b82f6' });
+    const result = await controller.update(req, 'tag-1', { name: 'feature', color: '#3b82f6' } as any);
+    expect(spy).toHaveBeenCalledWith('proj-1', 'tag-1', { name: 'feature', color: '#3b82f6' });
     expect(result).toEqual(updated);
   });
 

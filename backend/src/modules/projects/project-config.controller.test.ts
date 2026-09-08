@@ -7,8 +7,11 @@ describe('ProjectConfigController (unit)', () => {
   const mockStatus = { id: 'status-1', projectId: 'proj-1', name: 'Todo', color: '#6B7280', category: 'todo', isDefault: true, sortOrder: '0' };
   const mockPriority = { id: 'prio-1', projectId: 'proj-1', name: 'Medium', color: '#F59E0B', isDefault: true, sortOrder: '0' };
 
-  function createController(mockService: Partial<ProjectConfigService>) {
-    return new ProjectConfigController(mockService as ProjectConfigService);
+  function createController(mockService: Partial<ProjectConfigService>, mockTransfer?: Record<string, ReturnType<typeof vi.fn>>) {
+    return new ProjectConfigController(
+      mockService as ProjectConfigService,
+      (mockTransfer ?? { exportConfig: vi.fn(), importFile: vi.fn() }) as any,
+    );
   }
 
   const req = { projectId: 'proj-1' } as any;
@@ -36,16 +39,16 @@ describe('ProjectConfigController (unit)', () => {
   it('updateType should call service and return updated type', async () => {
     const spy = vi.fn(async () => ({ ...mockType, name: 'Bug' }) as any);
     const controller = createController({ updateType: spy });
-    const result = await controller.updateType('type-1', { name: 'Bug' } as any);
-    expect(spy).toHaveBeenCalledWith('type-1', { name: 'Bug' });
+    const result = await controller.updateType(req, 'type-1', { name: 'Bug' } as any);
+    expect(spy).toHaveBeenCalledWith('proj-1', 'type-1', { name: 'Bug' });
     expect(result).toMatchObject({ name: 'Bug' });
   });
 
   it('deleteType should return success', async () => {
     const spy = vi.fn(async () => undefined);
     const controller = createController({ deleteType: spy });
-    const result = await controller.deleteType('type-1');
-    expect(spy).toHaveBeenCalledWith('type-1');
+    const result = await controller.deleteType(req, 'type-1');
+    expect(spy).toHaveBeenCalledWith('proj-1', 'type-1');
     expect(result).toEqual({ success: true });
   });
 
@@ -65,7 +68,7 @@ describe('ProjectConfigController (unit)', () => {
 
   it('deleteStatus should return success', async () => {
     const controller = createController({ deleteStatus: async () => undefined });
-    const result = await controller.deleteStatus('status-1');
+    const result = await controller.deleteStatus(req, 'status-1');
     expect(result).toEqual({ success: true });
   });
 
@@ -85,7 +88,7 @@ describe('ProjectConfigController (unit)', () => {
 
   it('deletePriority should return success', async () => {
     const controller = createController({ deletePriority: async () => undefined });
-    const result = await controller.deletePriority('prio-1');
+    const result = await controller.deletePriority(req, 'prio-1');
     expect(result).toEqual({ success: true });
   });
 });

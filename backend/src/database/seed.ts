@@ -90,6 +90,11 @@ async function seed() {
     { id: randomUUID(), projectId, sequenceNum: 3, title: 'Add dark mode support', typeId: taskType!.id, statusId: doneStatus!.id, priorityId: medPriority!.id, assigneeId: aliceId, reporterId: bobId },
   ]);
 
+  // Keep the sequence in sync with the seeded rows: the next API-created
+  // item takes lastValue + 1, so a stale 0 would collide with seq 1..3
+  // (unique constraint on project_id + sequence_num).
+  await db.update(issueSequences).set({ lastValue: 3 }).where(eq(issueSequences.projectId, projectId));
+
   await db.insert(tags).values([
     { projectId, name: 'frontend', color: '#3B82F6' },
     { projectId, name: 'backend', color: '#10B981' },

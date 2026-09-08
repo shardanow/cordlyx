@@ -11,8 +11,10 @@ import { DndContext, DragEndEvent, DragStartEvent, useDroppable, useDraggable, D
 import {
   Search, Plus, X, ZoomIn, ZoomOut, Maximize2, GripVertical, GripHorizontal,
   ChevronDown, ChevronRight, Link as LinkIcon,
-  Calendar, ExternalLink, icons,
+  Calendar, ExternalLink,
 } from 'lucide-react';
+import { TypeIcon } from '@/components/features/TypeIcon';
+import { StatusDot } from '@/components/features/StatusDot';
 
 type TimeMode = 'day' | 'week' | 'month' | 'quarter';
 
@@ -119,12 +121,6 @@ const TYPE_ICON_MAP: Record<string, string> = {
   Epic: '◷', Story: '▣',
 };
 
-const ICON_ALIASES: Record<string, string> = { 'check-square': 'SquareCheckBig' };
-
-function kebabToPascal(str: string): string {
-  return str.split('-').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join('');
-}
-
 // --- Sub-components ---
 
 function DraggableUnscheduledItem({ item, statusColor }: { item: Item; statusColor: string }) {
@@ -142,7 +138,7 @@ function DraggableUnscheduledItem({ item, statusColor }: { item: Item; statusCol
       className={`flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card cursor-grab active:cursor-grabbing transition-shadow hover:shadow-sm ${isDragging ? 'opacity-0' : ''}`}
     >
       <GripVertical className="w-3 h-3 text-muted-foreground shrink-0" />
-      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: statusColor }} />
+      <StatusDot color={statusColor} className="w-2 h-2" />
       <span className="text-xs text-muted-foreground font-mono shrink-0">#{item.sequenceNum}</span>
       <span className="text-sm font-semibold truncate flex-1">{item.title}</span>
     </div>
@@ -153,7 +149,7 @@ function DragOverlayItem({ item, statusColor }: { item: Item; statusColor: strin
   return (
     <div title={item.title} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card shadow-xl opacity-90 rotate-[3deg]">
       <GripVertical className="w-3 h-3 text-muted-foreground shrink-0" />
-      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: statusColor }} />
+      <StatusDot color={statusColor} className="w-2 h-2" />
       <span className="text-xs text-muted-foreground font-mono shrink-0">#{item.sequenceNum}</span>
       <span className="text-sm font-semibold truncate flex-1">{item.title}</span>
     </div>
@@ -615,11 +611,17 @@ export default function RoadmapEditorPage() {
     const newIdx = direction === 'up' ? idx - 1 : idx + 1;
     if (newIdx < 0 || newIdx >= lanes.length) return;
 
+    const reordered = [...lanes];
+    const [moved] = reordered.splice(idx, 1);
+    reordered.splice(newIdx, 0, moved!);
     try {
-      await api.patch(`/projects/${slug}/roadmaps/${roadmapId}/lanes/${laneId}`, { sortOrder: lanes[newIdx].sortOrder });
-      await api.patch(`/projects/${slug}/roadmaps/${roadmapId}/lanes/${lanes[newIdx].id}`, { sortOrder: lanes[idx].sortOrder });
+      // Single atomic call; refetch restores order on failure.
+      await api.patch(`/projects/${slug}/roadmaps/${roadmapId}/lanes/reorder`, {
+        laneIds: reordered.map((l) => l.id),
+      });
       queryClient.invalidateQueries({ queryKey: ['roadmap-items', slug, roadmapId] });
     } catch {
+      queryClient.invalidateQueries({ queryKey: ['roadmap-items', slug, roadmapId] });
       toast.error('Failed to reorder lanes');
     }
   };
@@ -1260,14 +1262,13 @@ export default function RoadmapEditorPage() {
                                         onMouseDown={(e) => { if (!linkingMode) handleBarMouseDown(e, item, 'move', barColor); }}
                                       >
                                         {isMilestone && <span className="text-[10px] shrink-0">◆</span>}
-                                        {(() => {
-                                          if (!type) return null;
-                                          const iconName = type.icon ? (ICON_ALIASES[type.icon] ?? kebabToPascal(type.icon)) : null;
-                                          const IconComp = iconName ? (icons as any)[iconName] : null;
-                                          return IconComp
-                                            ? <span className="shrink-0 flex items-center" style={{ color: type.color }}><IconComp className="w-3.5 h-3.5" /></span>
-                                            : <span className="text-xs shrink-0 leading-none" style={{ color: type.color }}>{TYPE_ICON_MAP[type.name] || type.name[0]}</span>;
-                                        })()}
+                                        {type && (type.icon ? (
+                                          <span className="shrink-0 flex items-center" style={{ color: type.color }}>
+                                            <TypeIcon name={type.icon} className="w-3.5 h-3.5" />
+                                          </span>
+                                        ) : (
+                                          <span className="text-xs shrink-0 leading-none" style={{ color: type.color }}>{TYPE_ICON_MAP[type.name] || type.name[0]}</span>
+                                        ))}
                                         <span className="text-xs font-semibold truncate">{item.title}</span>
                                         {dateStr && <span className="text-[10px] text-muted-foreground/60 shrink-0 hidden sm:inline">{dateStr}</span>}
 

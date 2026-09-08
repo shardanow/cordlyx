@@ -9,7 +9,7 @@ test.describe('Auth', () => {
     await page.getByRole('button', { name: 'Sign In' }).click();
 
     await expect(page).toHaveURL('/projects', { timeout: 10000 });
-    await expect(page.getByText('Projects')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Projects', exact: true })).toBeVisible();
   });
 
   test('should show error on invalid credentials', async ({ page }) => {
@@ -19,7 +19,7 @@ test.describe('Auth', () => {
     await page.getByPlaceholder('Password').fill('wrongpassword');
     await page.getByRole('button', { name: 'Sign In' }).click();
 
-    await expect(page.getByText(/login failed/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/invalid login|login failed/i)).toBeVisible({ timeout: 5000 });
   });
 
   test('should logout and redirect to login', async ({ page }) => {

@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { getDb } from '../../database/client.js';
+import { decodeCursorDate } from '../../common/cursors.js';
 import { users } from '../../database/schema/users.js';
 import { projects } from '../../database/schema/projects.js';
 import { items } from '../../database/schema/items.js';
@@ -99,6 +100,9 @@ export class AdminService {
 
   async updateMemberRole(projectId: string, memberId: string, role: string) {
     const db = getDb();
+    if (!['admin', 'member', 'viewer'].includes(role)) {
+      throw new BadRequestException('Invalid role (admin, member, viewer)');
+    }
     const existing = await db
       .select({ id: projectMembers.id, role: projectMembers.role })
       .from(projectMembers)
@@ -113,11 +117,11 @@ export class AdminService {
         .from(projectMembers)
         .where(and(eq(projectMembers.projectId, projectId), eq(projectMembers.role as any, 'admin')));
       if (Number(adminCount[0]?.value ?? 0) <= 1) {
-        throw new NotFoundException('Cannot remove the last admin');
+        throw new ConflictException('Cannot remove the last admin');
       }
     }
 
-    await db.update(projectMembers).set({ role: role as any }).where(eq(projectMembers.id, memberId));
+    await db.update(projectMembers).set({ role: role as 'admin' | 'member' | 'viewer' }).where(eq(projectMembers.id, memberId));
     return { success: true };
   }
 
@@ -131,6 +135,7 @@ export class AdminService {
         joinedAt: projectMembers.joinedAt,
         name: users.name,
         email: users.email,
+        avatarUrl: users.avatarUrl,
       })
       .from(projectMembers)
       .innerJoin(users, eq(users.id, projectMembers.userId))
@@ -141,7 +146,7 @@ export class AdminService {
     const db = getDb();
     const conditions: any[] = [];
     if (cursor) {
-      const [cursorDate] = Buffer.from(cursor, 'base64').toString('utf-8').split('|');
+      const { date: cursorDate } = decodeCursorDate(cursor);
       conditions.push(sql`${activities.createdAt} < ${cursorDate}::timestamptz`);
     }
     const rows = await db
@@ -152,7 +157,7 @@ export class AdminService {
         oldValue: activities.oldValue,
         newValue: activities.newValue,
         createdAt: activities.createdAt,
-        actor: { id: users.id, name: users.name, email: users.email },
+        actor: { id: users.id, name: users.name, email: users.email, avatarUrl: users.avatarUrl },
         projectName: projects.name,
         projectSlug: projects.slug,
       })

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { JwtService } from '@nestjs/jwt';
@@ -54,5 +54,13 @@ describe('AuthController (unit)', () => {
       refresh: async () => { throw new Error('Invalid or expired refresh token'); },
     });
     await expect(controller.refresh({ refreshToken: 'bad' } as any)).rejects.toThrow('Invalid or expired refresh token');
+  });
+
+  it('logout should revoke the given refresh token', async () => {
+    const spy = vi.fn(async () => ({ success: true }));
+    const controller = createController({ logout: spy });
+    const result = await controller.logout({ id: 'u-1' } as any, { refreshToken: 'r-token' } as any);
+    expect(spy).toHaveBeenCalledWith('u-1', 'r-token');
+    expect(result).toEqual({ success: true });
   });
 });

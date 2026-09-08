@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { getDb } from '../../database/client.js';
 import { itemRelations } from '../../database/schema/relations.js';
 import { items } from '../../database/schema/items.js';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, sql } from 'drizzle-orm';
 
 @Injectable()
 export class RelationsService {
@@ -74,8 +74,21 @@ export class RelationsService {
     return db.select().from(itemRelations).where(eq(itemRelations.id, id)).limit(1).then((r) => r[0]);
   }
 
-  async delete(relationId: string) {
+  async delete(relationId: string, projectId: string) {
     const db = getDb();
+    // Only delete when at least one side of the relation lives in this project.
+    const [rel] = await db
+      .select({
+        id: itemRelations.id,
+        sourceProjectId: sql<string | null>`(SELECT ${items.projectId} FROM ${items} WHERE ${items.id} = ${itemRelations.sourceItemId})`,
+        targetProjectId: sql<string | null>`(SELECT ${items.projectId} FROM ${items} WHERE ${items.id} = ${itemRelations.targetItemId})`,
+      })
+      .from(itemRelations)
+      .where(eq(itemRelations.id, relationId))
+      .limit(1);
+    if (!rel || (rel.sourceProjectId !== projectId && rel.targetProjectId !== projectId)) {
+      throw new NotFoundException('Relation not found');
+    }
     await db.delete(itemRelations).where(eq(itemRelations.id, relationId));
     return { success: true };
   }

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { getDb } from '../../database/client.js';
+import { getDb, type DbClient } from '../../database/client.js';
 import { invites } from '../../database/schema/invites.js';
 import { projects } from '../../database/schema/projects.js';
 import { projectMembers } from '../../database/schema/members.js';
@@ -61,17 +61,21 @@ export class InvitesService {
 
     if (existing[0]) throw new BadRequestException('Already a member of this project');
 
-    // Add as member
-    const memberId = randomUUID();
-    await db.insert(projectMembers).values({
-      id: memberId,
-      projectId: invite.projectId,
-      userId,
-      role: invite.role as 'admin' | 'member' | 'viewer',
-    });
+    // Member insert + invite consumption are atomic: no orphan members,
+    // no reusable invites after a mid-way failure.
+    await getDb().transaction(async (txx) => {
+      const tx = txx as unknown as DbClient;
+      const memberId = randomUUID();
+      await tx.insert(projectMembers).values({
+        id: memberId,
+        projectId: invite.projectId,
+        userId,
+        role: invite.role as 'admin' | 'member' | 'viewer',
+      });
 
-    // Mark invite as used
-    await db.update(invites).set({ usedAt: new Date() }).where(eq(invites.id, invite.id));
+      // Mark invite as used
+      await tx.update(invites).set({ usedAt: new Date() }).where(eq(invites.id, invite.id));
+    });
 
     return { projectId: invite.projectId, projectName: invite.projectName, projectSlug: invite.projectSlug };
   }

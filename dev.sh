@@ -142,8 +142,7 @@ db_dump() {
     "$ROOT_DIR/backup/backup.sh" --db
 }
 
-db_restore() {
-    local backup_dir="$ROOT_DIR/backups"
+db_restore() {    local backup_dir="$ROOT_DIR/backups"
     if [ ! -d "$backup_dir" ] || [ -z "$(ls -A "$backup_dir"/*.sql 2>/dev/null)" ]; then
         log_error "No dump files found in backups/"
         return 1
@@ -266,6 +265,79 @@ full_stack() {
     wait
 }
 
+doctor() {
+    trap - EXIT INT TERM # read-only check: never stop services on exit
+    local fails=0 warns=0
+    pass() { log_ok "$1"; }
+    warn() { log_warn "$1"; warns=$((warns + 1)); }
+    fail() { log_error "$1"; fails=$((fails + 1)); }
+
+    log_info "=== CordLyx doctor ==="
+
+    # --- Toolchain ---
+    command -v docker &>/dev/null && pass "docker: $(docker --version | head -1)" || fail "docker: missing"
+    if command -v node &>/dev/null; then
+        local major; major=$(node -p "process.versions.node.split('.')[0]")
+        [ "$major" -ge 22 ] && pass "node: $(node --version)" || warn "node: $(node --version) (22+ recommended)"
+    else
+        fail "node: missing"
+    fi
+    command -v npm &>/dev/null && pass "npm: $(npm --version)" || fail "npm: missing"
+    command -v psql &>/dev/null && pass "psql client available" || warn "psql client missing (needed for backup/verify-restore.sh)"
+    [ -f .env ] && pass ".env present" || fail ".env missing (run: cp .env.example .env)"
+    if [ -f .env ]; then
+        local secret_len; secret_len=$(grep -E '^JWT_SECRET=' .env | cut -d= -f2 | tr -d '[:space:]' | wc -c)
+        [ "$secret_len" -ge 32 ] && pass "JWT_SECRET length ok" || warn "JWT_SECRET shorter than 32 chars"
+    fi
+    [ -d node_modules ] && pass "node_modules installed" || fail "node_modules missing (run: npm ci)"
+    [ -f packages/shared/dist/cjs/index.js ] || [ -f packages/shared/dist/index.js ] && pass "shared package built" || warn "shared package not built (run: npm run build -w packages/shared)"
+
+    # --- Infra ---
+    if docker info &>/dev/null; then
+        pass "docker daemon reachable"
+    else
+        fail "docker daemon unreachable"
+    fi
+    for svc in postgres redis; do
+        if docker compose ps --status running 2>/dev/null | grep -q "$svc"; then
+            pass "$svc container running"
+        else
+            warn "$svc container not running (run: ./dev.sh infra)"
+        fi
+    done
+
+    # --- Data layer ---
+    if docker compose exec -T postgres pg_isready -U cordlyx &>/dev/null; then
+        pass "postgres accepting connections"
+        local tables; tables=$(docker compose exec -T postgres psql -U cordlyx cordlyx -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public';" 2>/dev/null | tr -d '[:space:]')
+        [ "${tables:-0}" -ge 20 ] && pass "dev schema present ($tables tables)" || warn "dev schema missing/empty ($tables tables, run: ./dev.sh db)"
+        local sv; sv=$(docker compose exec -T postgres psql -U cordlyx cordlyx -tAc "SELECT COUNT(*) FROM information_schema.columns WHERE table_name='items' AND column_name='search_vector';" 2>/dev/null | tr -d '[:space:]')
+        [ "${sv:-0}" -ge 1 ] && pass "search_vector generated column present" || warn "search_vector missing (run: ./dev.sh db)"
+        docker compose exec -T redis redis-cli ping &>/dev/null && pass "redis PONG" || warn "redis not reachable"
+    else
+        warn "postgres not reachable — skipping DB checks"
+    fi
+
+    # --- Services (checked only if listening) ---
+    if curl -sf -m 3 http://localhost:4000/health &>/dev/null; then
+        pass "backend healthy (:4000/health)"
+    else
+        warn "backend not responding on :4000"
+    fi
+    if curl -sf -m 3 http://localhost:3000/login -o /dev/null &>/dev/null; then
+        pass "frontend responding (:3000)"
+    else
+        warn "frontend not responding on :3000"
+    fi
+
+    echo ""
+    if [ "$fails" -gt 0 ]; then
+        log_error "doctor: $fails failing, $warns warnings"
+        return 1
+    fi
+    log_ok "doctor: all good ($warns warnings)"
+}
+
 show_menu() {
     echo ""
     echo -e "${CYAN}CordLyx Dev Launcher${NC}"
@@ -285,9 +357,10 @@ show_menu() {
     echo "13) Backup: full (DB + uploads)"
     echo "14) Backup: database only"
     echo "15) Backup: uploads only"
+    echo "16) Doctor (environment check)"
     echo "q)  Quit"
     echo ""
-    read -rp "Select option [1-15/q]: " choice
+    read -rp "Select option [1-16/q]: " choice
     echo ""
     case "$choice" in
         1) full_stack ;;
@@ -305,6 +378,7 @@ show_menu() {
         13) backup ;;
         14) db_dump ;;
         15) backup_uploads ;;
+        16) doctor ;;
         q|Q) exit 0 ;;
         *) log_error "Invalid option" && show_menu ;;
     esac
@@ -329,6 +403,7 @@ if [ $# -gt 0 ]; then
         backup-uploads) backup_uploads ;;
         test)    run_tests ;;
         report)  run_tests_coverage ;;
+        doctor)  doctor ;;
         *)       log_error "Unknown command: $1" && exit 1 ;;
     esac
 else

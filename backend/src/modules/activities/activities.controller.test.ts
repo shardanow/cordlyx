@@ -2,6 +2,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { ActivitiesController } from './activities.controller.js';
 import { ActivitiesService } from './activities.service.js';
 
+vi.mock('../../common/assert-item.js', () => ({
+  assertItemInProject: vi.fn(async () => ({ id: 'item-1' })),
+}));
+
 describe('ActivitiesController (unit)', () => {
   const mockActivities = {
     data: [
@@ -42,7 +46,7 @@ describe('ActivitiesController (unit)', () => {
   it('getItemActivity should return item-level activity', async () => {
     const spy = vi.fn(async () => mockActivities);
     const controller = createController({ getByItem: spy });
-    const result = await controller.getItemActivity('item-1', {});
+    const result = await controller.getItemActivity({ projectId: 'proj-1' } as any, 'item-1', {});
     expect(spy).toHaveBeenCalledWith('item-1', undefined, 50);
     expect(result).toEqual(mockActivities);
   });
@@ -50,7 +54,7 @@ describe('ActivitiesController (unit)', () => {
   it('getItemActivity should pass cursor and limit', async () => {
     const spy = vi.fn(async () => mockActivities);
     const controller = createController({ getByItem: spy });
-    await controller.getItemActivity('item-1', { cursor: 'xyz', limit: '5' } as any);
+    await controller.getItemActivity({ projectId: 'proj-1' } as any, 'item-1', { cursor: 'xyz', limit: '5' } as any);
     expect(spy).toHaveBeenCalledWith('item-1', 'xyz', 5);
   });
 });

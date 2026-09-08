@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Delete, Param, Query, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Patch, Delete, Param, Query, Body, UseGuards, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
 import { JwtAuthGuard, AdminGuard, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
 import { AdminService } from './admin.service.js';
 
@@ -78,6 +78,13 @@ export class AdminController {
   @Get('activity')
   @UseGuards(JwtAuthGuard, AdminGuard)
   async activity(@Query('cursor') cursor?: string, @Query('limit') limit?: string) {
-    return this.adminService.getGlobalActivity(cursor, limit ? parseInt(limit, 10) : 50);
+    let parsedLimit = 50;
+    if (limit !== undefined) {
+      parsedLimit = Number(limit);
+      if (!Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > 100) {
+        throw new BadRequestException('Invalid limit');
+      }
+    }
+    return this.adminService.getGlobalActivity(cursor, parsedLimit);
   }
 }

@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth-store';
 import { toast } from 'sonner';
 import Spinner from '@/components/Spinner';
+import { Avatar } from '@/components/ui/avatar';
 import { Link as LinkIcon, Check, Copy } from 'lucide-react';
 
 interface Member {
@@ -190,13 +191,7 @@ export default function MembersPage() {
                     onClick={() => handleSelectUser(user)}
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-sm bg-background hover:bg-muted transition text-left border-b border-border last:border-b-0"
                   >
-                    <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-medium shrink-0 overflow-hidden">
-                      {user.avatarUrl ? (
-                        <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        user.name.charAt(0).toUpperCase()
-                      )}
-                    </div>
+                    <Avatar src={user.avatarUrl} name={user.name} size="sm" />
                     <div className="flex-1 min-w-0">
                       <div className="truncate font-medium">{user.name}</div>
                       <div className="truncate text-xs text-muted-foreground">{user.email}</div>

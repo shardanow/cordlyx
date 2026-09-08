@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { getDb } from '../../database/client.js';
 import { itemTypes, itemStatuses, itemPriorities } from '../../database/schema/config.js';
 import { CacheService } from '../../cache/cache.service.js';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 
 @Injectable()
@@ -41,19 +41,30 @@ export class ProjectConfigService {
     return db.select().from(itemTypes).where(eq(itemTypes.id, id)).limit(1).then((r) => r[0]);
   }
 
-  async updateType(typeId: string, data: { name?: string; color?: string; icon?: string | null; sortOrder?: number }) {
+  async updateType(projectId: string, typeId: string, data: { name?: string; color?: string; icon?: string | null; sortOrder?: number }) {
     const db = getDb();
+    await this.assertTypeInProject(projectId, typeId);
     await db.update(itemTypes).set({ ...data, updatedAt: new Date() }).where(eq(itemTypes.id, typeId));
     const result = await db.select().from(itemTypes).where(eq(itemTypes.id, typeId)).limit(1);
     if (result[0]) await this.cache.del(this.configKey(result[0].projectId, 'types'));
     return result[0];
   }
 
-  async deleteType(typeId: string) {
+  async deleteType(projectId: string, typeId: string) {
     const db = getDb();
-    const [row] = await db.select({ projectId: itemTypes.projectId }).from(itemTypes).where(eq(itemTypes.id, typeId)).limit(1);
+    await this.assertTypeInProject(projectId, typeId);
     await db.delete(itemTypes).where(eq(itemTypes.id, typeId));
-    if (row) await this.cache.del(this.configKey(row.projectId, 'types'));
+    await this.cache.del(this.configKey(projectId, 'types'));
+  }
+
+  private async assertTypeInProject(projectId: string, typeId: string): Promise<void> {
+    const db = getDb();
+    const [row] = await db
+      .select({ id: itemTypes.id })
+      .from(itemTypes)
+      .where(and(eq(itemTypes.id, typeId), eq(itemTypes.projectId, projectId)))
+      .limit(1);
+    if (!row) throw new NotFoundException('Type not found in this project');
   }
 
   // --- Statuses ---
@@ -76,19 +87,30 @@ export class ProjectConfigService {
     return db.select().from(itemStatuses).where(eq(itemStatuses.id, id)).limit(1).then((r) => r[0]);
   }
 
-  async updateStatus(statusId: string, data: { name?: string; color?: string; category?: string; sortOrder?: number }) {
+  async updateStatus(projectId: string, statusId: string, data: { name?: string; color?: string; category?: string; sortOrder?: number }) {
     const db = getDb();
+    await this.assertStatusInProject(projectId, statusId);
     await db.update(itemStatuses).set({ ...data, updatedAt: new Date() }).where(eq(itemStatuses.id, statusId));
     const result = await db.select().from(itemStatuses).where(eq(itemStatuses.id, statusId)).limit(1);
     if (result[0]) await this.cache.del(this.configKey(result[0].projectId, 'statuses'));
     return result[0];
   }
 
-  async deleteStatus(statusId: string) {
+  async deleteStatus(projectId: string, statusId: string) {
     const db = getDb();
-    const [row] = await db.select({ projectId: itemStatuses.projectId }).from(itemStatuses).where(eq(itemStatuses.id, statusId)).limit(1);
+    await this.assertStatusInProject(projectId, statusId);
     await db.delete(itemStatuses).where(eq(itemStatuses.id, statusId));
-    if (row) await this.cache.del(this.configKey(row.projectId, 'statuses'));
+    await this.cache.del(this.configKey(projectId, 'statuses'));
+  }
+
+  private async assertStatusInProject(projectId: string, statusId: string): Promise<void> {
+    const db = getDb();
+    const [row] = await db
+      .select({ id: itemStatuses.id })
+      .from(itemStatuses)
+      .where(and(eq(itemStatuses.id, statusId), eq(itemStatuses.projectId, projectId)))
+      .limit(1);
+    if (!row) throw new NotFoundException('Status not found in this project');
   }
 
   // --- Priorities ---
@@ -111,18 +133,29 @@ export class ProjectConfigService {
     return db.select().from(itemPriorities).where(eq(itemPriorities.id, id)).limit(1).then((r) => r[0]);
   }
 
-  async updatePriority(priorityId: string, data: { name?: string; color?: string | null; icon?: string | null; sortOrder?: number }) {
+  async updatePriority(projectId: string, priorityId: string, data: { name?: string; color?: string | null; icon?: string | null; sortOrder?: number }) {
     const db = getDb();
+    await this.assertPriorityInProject(projectId, priorityId);
     await db.update(itemPriorities).set({ ...data, updatedAt: new Date() }).where(eq(itemPriorities.id, priorityId));
     const result = await db.select().from(itemPriorities).where(eq(itemPriorities.id, priorityId)).limit(1);
     if (result[0]) await this.cache.del(this.configKey(result[0].projectId, 'priorities'));
     return result[0];
   }
 
-  async deletePriority(priorityId: string) {
+  async deletePriority(projectId: string, priorityId: string) {
     const db = getDb();
-    const [row] = await db.select({ projectId: itemPriorities.projectId }).from(itemPriorities).where(eq(itemPriorities.id, priorityId)).limit(1);
+    await this.assertPriorityInProject(projectId, priorityId);
     await db.delete(itemPriorities).where(eq(itemPriorities.id, priorityId));
-    if (row) await this.cache.del(this.configKey(row.projectId, 'priorities'));
+    await this.cache.del(this.configKey(projectId, 'priorities'));
+  }
+
+  private async assertPriorityInProject(projectId: string, priorityId: string): Promise<void> {
+    const db = getDb();
+    const [row] = await db
+      .select({ id: itemPriorities.id })
+      .from(itemPriorities)
+      .where(and(eq(itemPriorities.id, priorityId), eq(itemPriorities.projectId, projectId)))
+      .limit(1);
+    if (!row) throw new NotFoundException('Priority not found in this project');
   }
 }

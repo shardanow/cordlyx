@@ -9,24 +9,8 @@ import Link from 'next/link';
 import { useEscToClose } from '@/hooks/use-esc-to-close';
 import { Select, SelectTrigger, SelectContent, SelectOption } from '@/components/ui/select';
 import RichEditor from '@/components/RichEditor';
-import { icons, GripHorizontal } from 'lucide-react';
-
-function kebabToPascal(str: string): string {
-  return str.split('-').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join('');
-}
-
-const ICON_ALIASES: Record<string, string> = {
-  'check-square': 'SquareCheckBig',
-};
-
-function TypeIcon({ name, className, color }: { name: string | null; className?: string; color?: string }) {
-  if (!name) return null;
-  const m = icons as unknown as Record<string, React.ComponentType<{ className?: string; color?: string }> | undefined>;
-  const key = ICON_ALIASES[name] ?? kebabToPascal(name);
-  const LucideIcon = m[key];
-  if (LucideIcon) return <LucideIcon className={className ?? 'w-4 h-4'} color={color} />;
-  return <span className="w-4 h-4 flex items-center justify-center text-xs" style={color ? { color } : undefined}>{name}</span>;
-}
+import { TypeIcon } from '@/components/features/TypeIcon';
+import { GripHorizontal } from 'lucide-react';
 
 interface Project {
   id: string;

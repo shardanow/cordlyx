@@ -30,7 +30,7 @@ describe('ApiKeysController (unit)', () => {
     const spy = vi.fn(async () => withKey as any);
     const controller = createController({ create: spy });
     const result = await controller.create(user, { name: 'CI Key' });
-    expect(spy).toHaveBeenCalledWith('user-1', { name: 'CI Key' });
+      expect(spy).toHaveBeenCalledWith('user-1', { name: 'CI Key', rateLimitPerMin: 120 });
     expect(result).toEqual(withKey);
   });
 
@@ -52,5 +52,18 @@ describe('ApiKeysController (unit)', () => {
       revoke: async () => { throw new NotFoundException('API key not found'); },
     });
     await expect(controller.revoke(user, 'bad-id')).rejects.toThrow('API key not found');
+  });
+
+  it('update should pass name and rate limit', async () => {
+    const spy = vi.fn(async () => ({ ...mockKey, rateLimitPerMin: 10 }) as any);
+    const controller = createController({ update: spy });
+    const result = await controller.update(user, 'key-1', { name: 'Renamed', rateLimitPerMin: 10 });
+    expect(spy).toHaveBeenCalledWith('user-1', 'key-1', { name: 'Renamed', rateLimitPerMin: 10 });
+    expect(result).toMatchObject({ rateLimitPerMin: 10 });
+  });
+
+  it('update should throw on out-of-range limit', async () => {
+    const controller = createController({ update: async () => mockKey as any });
+    await expect(controller.update(user, 'key-1', { rateLimitPerMin: 0 })).rejects.toThrow();
   });
 });

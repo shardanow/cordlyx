@@ -57,16 +57,21 @@ describe('ProjectConfigService', () => {
     it('should update a type', async () => {
       const types = await configService.getTypes(projectId);
       const type = types.find((t) => t.name === 'Spike')!;
-      const updated = await configService.updateType(type.id, { name: 'Spike Updated' });
+      const updated = await configService.updateType(projectId, type.id, { name: 'Spike Updated' });
       expect(updated!.name).toBe('Spike Updated');
     });
 
     it('should delete a type', async () => {
       const types = await configService.getTypes(projectId);
       const type = types.find((t) => t.name === 'Spike Updated')!;
-      await configService.deleteType(type.id);
+      await configService.deleteType(projectId, type.id);
       const remaining = await configService.getTypes(projectId);
       expect(remaining.some((t) => t.id === type.id)).toBe(false);
+    });
+
+    it('should throw NotFound for a type from another project', async () => {
+      await expect(configService.updateType(projectId, randomUUID(), { name: 'x' })).rejects.toThrow('Type not found');
+      await expect(configService.deleteType(projectId, randomUUID())).rejects.toThrow('Type not found');
     });
   });
 
@@ -87,14 +92,14 @@ describe('ProjectConfigService', () => {
     it('should update a status', async () => {
       const statuses = await configService.getStatuses(projectId);
       const status = statuses.find((s) => s.name === 'Needs Review')!;
-      const updated = await configService.updateStatus(status.id, { name: 'Awaiting Review' });
+      const updated = await configService.updateStatus(projectId, status.id, { name: 'Awaiting Review' });
       expect(updated!.name).toBe('Awaiting Review');
     });
 
     it('should delete a status', async () => {
       const statuses = await configService.getStatuses(projectId);
       const status = statuses.find((s) => s.name === 'Awaiting Review')!;
-      await configService.deleteStatus(status.id);
+      await configService.deleteStatus(projectId, status.id);
       const remaining = await configService.getStatuses(projectId);
       expect(remaining.some((s) => s.id === status.id)).toBe(false);
     });
@@ -117,14 +122,14 @@ describe('ProjectConfigService', () => {
     it('should update a priority', async () => {
       const priorities = await configService.getPriorities(projectId);
       const priority = priorities.find((p) => p.name === 'Urgent')!;
-      const updated = await configService.updatePriority(priority.id, { name: 'Super Urgent' });
+      const updated = await configService.updatePriority(projectId, priority.id, { name: 'Super Urgent' });
       expect(updated!.name).toBe('Super Urgent');
     });
 
     it('should delete a priority', async () => {
       const priorities = await configService.getPriorities(projectId);
       const priority = priorities.find((p) => p.name === 'Super Urgent')!;
-      await configService.deletePriority(priority.id);
+      await configService.deletePriority(projectId, priority.id);
       const remaining = await configService.getPriorities(projectId);
       expect(remaining.some((p) => p.id === priority.id)).toBe(false);
     });

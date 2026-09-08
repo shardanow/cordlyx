@@ -1,31 +1,51 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException } from '@nestjs/common';
 import { getDb } from '../../database/client.js';
+import { decodeCursorDate } from '../../common/cursors.js';
 import { items } from '../../database/schema/items.js';
 import { projects } from '../../database/schema/projects.js';
-import { eq, and, sql, isNull, desc } from 'drizzle-orm';
+import { projectMembers } from '../../database/schema/members.js';
+import { eq, and, sql, isNull, desc, inArray } from 'drizzle-orm';
 
 @Injectable()
 export class SearchService {
   async search(
     query: string,
+    userId: string,
     projectId?: string,
     options?: { cursor?: string; limit?: number },
   ) {
     const db = getDb();
     const limit = Math.min(options?.limit ?? 50, 100);
 
+    // Scope: explicit project must be joined by the user, otherwise only member projects.
+    const memberships = await db
+      .select({ projectId: projectMembers.projectId })
+      .from(projectMembers)
+      .where(eq(projectMembers.userId, userId));
+    const allowed = memberships.map((m) => m.projectId);
+    if (projectId) {
+      if (!allowed.includes(projectId)) {
+        throw new ForbiddenException('You are not a member of this project');
+      }
+    } else if (allowed.length === 0) {
+      return { data: [], meta: { cursor: null, hasMore: false, limit } };
+    }
+
     const conditions = [isNull(items.deletedAt)] as any[];
 
     if (projectId) {
       conditions.push(eq(items.projectId, projectId));
+    } else {
+      conditions.push(inArray(items.projectId, allowed));
     }
 
     if (options?.cursor) {
-      const decoded = Buffer.from(options.cursor, 'base64').toString('utf-8');
-      const [cursorDate, cursorId] = decoded.split('|');
+      const { date: cursorDate, id: cursorId } = decodeCursorDate(options.cursor);
       // Proper keyset pagination: (date < cursorDate) OR (date = cursorDate AND id < cursorId)
       conditions.push(
-        sql`(${items.createdAt} < ${cursorDate}::timestamptz OR (${items.createdAt} = ${cursorDate}::timestamptz AND ${items.id} < ${cursorId}))`,
+        cursorId
+          ? sql`(${items.createdAt} < ${cursorDate}::timestamptz OR (${items.createdAt} = ${cursorDate}::timestamptz AND ${items.id} < ${cursorId}))`
+          : sql`${items.createdAt} < ${cursorDate}::timestamptz`,
       );
     }
 

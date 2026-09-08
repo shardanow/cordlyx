@@ -1,7 +1,16 @@
-export function AvatarCircle({ name, className }: { name: string; className?: string }) {
-  return (
-    <div className={`w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-medium shrink-0 ${className ?? ''}`}>
-      {name.charAt(0).toUpperCase()}
-    </div>
-  );
+import { Avatar } from '@/components/ui/avatar';
+
+interface AvatarCircleProps {
+  name: string;
+  avatarUrl?: string | null;
+  size?: 'xs' | 'sm' | 'md' | 'lg';
+  className?: string;
+}
+
+/**
+ * User avatar: photo when avatarUrl is set, initial letter otherwise.
+ * Thin wrapper over ui/Avatar keeping the historic AvatarCircle API.
+ */
+export function AvatarCircle({ name, avatarUrl, size = 'sm', className }: AvatarCircleProps) {
+  return <Avatar src={avatarUrl ?? null} name={name} size={size} className={className} />;
 }

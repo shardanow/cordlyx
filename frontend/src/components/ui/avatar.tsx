@@ -16,6 +16,7 @@ const sizeClasses = {
 
 function Avatar({ src, name, size = 'md', className, ...props }: AvatarProps) {
     const initials = name?.charAt(0)?.toUpperCase() ?? '?';
+    const [failed, setFailed] = React.useState(false);
     return (
         <div
             className={cn(
@@ -25,8 +26,13 @@ function Avatar({ src, name, size = 'md', className, ...props }: AvatarProps) {
             )}
             {...props}
         >
-            {src ? (
-                <img src={src} alt={name ?? ''} className="w-full h-full object-cover" />
+            {src && !failed ? (
+                <img
+                    src={src}
+                    alt={name ?? ''}
+                    className="w-full h-full object-cover"
+                    onError={() => setFailed(true)}
+                />
             ) : (
                 <span>{initials}</span>
             )}

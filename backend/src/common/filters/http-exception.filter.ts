@@ -1,13 +1,22 @@
-import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
+import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { ZodError } from 'zod';
+import { NotModifiedException } from '../not-modified.exception.js';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
+  private readonly logger = new Logger('HttpExceptionsFilter');
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse();
     const request = ctx.getRequest();
+
+    // ETag hit: empty 304, no JSON envelope.
+    if (exception instanceof NotModifiedException) {
+      response.status(304).end();
+      return;
+    }
 
     // Handle Zod validation errors as 400
     if (exception instanceof ZodError) {
@@ -47,5 +56,16 @@ export class AllExceptionsFilter implements ExceptionFilter {
       requestId: request.requestId ?? randomUUID(),
       timestamp: new Date().toISOString(),
     });
+
+    // Visibility for ops: 5xx always logged, 429 (rate limiting) as warning.
+    // Routine 4xx stay quiet to avoid log flooding.
+    const method = request.method ?? '?';
+    const url = request.originalUrl ?? request.url ?? '?';
+    const msg = Array.isArray(message) ? message[0] : message;
+    if (status >= 500) {
+      this.logger.error(`${method} ${url} → ${status} requestId=${request.requestId ?? '-'} ${msg}`);
+    } else if (status === 429) {
+      this.logger.warn(`${method} ${url} → 429 rate limited`);
+    }
   }
 }

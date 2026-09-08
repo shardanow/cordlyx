@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { LoggerModule } from 'nestjs-pino';
+import { ApiKeyThrottlerGuard, apiKeyLimit, apiKeyTracker } from './common/guards/api-key-throttler.guard.js';
+import { authThrottleLimit } from './modules/auth/auth.controller.js';
 import { configModule } from './config/index.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { UsersModule } from './modules/users/users.module.js';
@@ -37,7 +39,20 @@ import { HealthController } from './health.controller.js';
       },
     }),
     ThrottlerModule.forRoot([
-      { name: 'default', ttl: 60000, limit: 60 },
+      {
+        name: 'default',
+        ttl: 60000,
+        limit: apiKeyLimit,
+        getTracker: apiKeyTracker,
+      },
+      // Isolated bucket for login/register: the storage block flag is
+      // per-key, so sharing the 'default' bucket would let data-traffic
+      // bursts lock users out of login for the whole block duration.
+      {
+        name: 'auth',
+        ttl: 60000,
+        limit: authThrottleLimit,
+      },
     ]),
     EventEmitterModule.forRoot({ wildcard: true, delimiter: '.' }),
     QueueModule,
@@ -65,7 +80,7 @@ import { HealthController } from './health.controller.js';
   providers: [
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: ApiKeyThrottlerGuard,
     },
   ],
 })

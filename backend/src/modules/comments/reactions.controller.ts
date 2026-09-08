@@ -1,12 +1,12 @@
 import { Controller, Post, Delete, Param, Body, UseGuards, Req } from '@nestjs/common';
 import { Request } from 'express';
-import { JwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
+import { ApiKeyOrJwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
 import { ReactionsService } from './reactions.service.js';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { addReactionSchema } from '@cordlyx/shared';
 
 @Controller('projects/:projectSlug/items/:itemId/comments/:commentId/reactions')
-@UseGuards(JwtAuthGuard, ProjectMembershipGuard)
+@UseGuards(ApiKeyOrJwtAuthGuard, ProjectMembershipGuard)
 export class ReactionsController {
   constructor(
     private readonly reactionsService: ReactionsService,

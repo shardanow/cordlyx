@@ -21,13 +21,13 @@ test.describe('Item lifecycle', () => {
     // Fallback to Ctrl+K for non-Mac
     await page.waitForTimeout(500);
 
-    // If meta didn't work, try the button
-    const quickCreateBtn = page.getByRole('button', { name: /quick create/i });
-    if (await quickCreateBtn.isVisible()) {
-      await quickCreateBtn.click();
+    // Meta+K may already have opened the modal (then the sidebar button
+    // sits behind the overlay and is not clickable) — only click if needed.
+    const qcHeading = page.getByRole('heading', { name: 'Quick create' });
+    if (!(await qcHeading.isVisible())) {
+      await page.getByRole('button', { name: /quick create/i }).click();
     }
-
-    await expect(page.getByText('Quick create')).toBeVisible({ timeout: 3000 });
+    await expect(qcHeading).toBeVisible({ timeout: 5000 });
 
     // Fill and submit
     await page.getByPlaceholder('Item title...').fill(TITLE);
@@ -35,7 +35,8 @@ test.describe('Item lifecycle', () => {
 
     // Should redirect to item detail page
     await expect(page).toHaveURL(/\/items\/\d+/, { timeout: 10000 });
-    await expect(page.getByText(TITLE)).toBeVisible({ timeout: 5000 });
+    // Title appears in sidebar/breadcrumb/list too — assert the detail h1
+    await expect(page.getByRole('heading', { name: TITLE })).toBeVisible({ timeout: 5000 });
   });
 
   test('should show item in list view after creation', async ({ page }) => {
@@ -49,21 +50,21 @@ test.describe('Item lifecycle', () => {
     await page.getByText('Demo').first().click();
     await page.keyboard.press('Meta+k');
     await page.waitForTimeout(500);
-    const quickCreateBtn = page.getByRole('button', { name: /quick create/i });
-    if (await quickCreateBtn.isVisible()) {
-      await quickCreateBtn.click();
+    const qcHeading2 = page.getByRole('heading', { name: 'Quick create' });
+    if (!(await qcHeading2.isVisible())) {
+      await page.getByRole('button', { name: /quick create/i }).click();
     }
-    await expect(page.getByText('Quick create')).toBeVisible({ timeout: 3000 });
+    await expect(qcHeading2).toBeVisible({ timeout: 5000 });
 
     const title = `List Check ${Date.now()}`;
     await page.getByPlaceholder('Item title...').fill(title);
     await page.getByRole('button', { name: /^Create$/ }).click();
     await expect(page).toHaveURL(/\/items\/\d+/, { timeout: 10000 });
 
-    // Go back to list
-    await page.getByRole('link', { name: /list/i }).click();
+    // Go back to list (exact name: the sidebar item sub-link also contains "List")
+    await page.getByRole('link', { name: 'Items List', exact: true }).click();
     await expect(page).toHaveURL(/\/projects\/demo$/);
-    await expect(page.getByText(title)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(title).first()).toBeVisible({ timeout: 5000 });
   });
 
   test('should add and delete a comment on an item', async ({ page }) => {
@@ -77,28 +78,30 @@ test.describe('Item lifecycle', () => {
     await page.getByText('Demo').first().click();
     await expect(page).toHaveURL(/\/projects\/demo/);
 
-    // Click the first item in the list
-    const firstItemLink = page.getByRole('link', { name: /#\d+/ }).first();
+    // Click the first item in the list (desktop rows link the title,
+    // mobile rows show #seq — href works for both viewports)
+    const firstItemLink = page.locator('a[href*="/items/"]').first();
     await firstItemLink.click();
     await expect(page).toHaveURL(/\/items\/\d+/);
 
-    // Add a comment
+    // Add a comment (comment form is a collapsed RichEditor button)
     const commentText = `E2E comment ${Date.now()}`;
-    await page.getByPlaceholder('Write a comment...').fill(commentText);
-    await page.getByRole('button', { name: /comment/i }).click();
-    await expect(page.getByText(commentText)).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: 'Write a comment...', exact: true }).click();
+    await page.locator('.ProseMirror').fill(commentText);
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(page.getByText(commentText).first()).toBeVisible({ timeout: 5000 });
 
     // Edit the comment
-    await page.getByRole('button', { name: /edit/i }).first().click();
+    await page.getByTitle('Edit comment').first().click();
     const editedText = `${commentText} edited`;
-    await page.getByPlaceholder('Write a comment...').fill(editedText);
+    await page.locator('.ProseMirror').fill(editedText);
     // Look for Save button which appears during edit
-    await page.getByRole('button', { name: /save/i }).click();
-    await expect(page.getByText(editedText)).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText(editedText).first()).toBeVisible({ timeout: 5000 });
 
-    // Delete the comment
-    await page.getByRole('button', { name: /delete/i }).first().click();
-    await expect(page.getByText(editedText)).not.toBeVisible({ timeout: 3000 });
+    // Delete the comment (no confirm dialog — direct delete + toast)
+    await page.getByTitle('Delete comment').first().click();
+    await expect(page.getByText(editedText)).not.toBeVisible({ timeout: 5000 });
   });
 
   test('should toggle tags on an item', async ({ page }) => {
@@ -113,7 +116,7 @@ test.describe('Item lifecycle', () => {
     await expect(page).toHaveURL(/\/projects\/demo/);
 
     // Click the first item
-    const firstItemLink = page.getByRole('link', { name: /#\d+/ }).first();
+    const firstItemLink = page.locator('a[href*="/items/"]').first();
     await firstItemLink.click();
     await expect(page).toHaveURL(/\/items\/\d+/);
 

@@ -13,6 +13,7 @@ import TableCell from '@tiptap/extension-table-cell';
 import TableHeader from '@tiptap/extension-table-header';
 import Mention from '@tiptap/extension-mention';
 import { ResizableImage } from './ResizableImage';
+import { PromptModal } from './ui/confirm-modal';
 import { useEffect, useCallback, useRef, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -77,6 +78,8 @@ export default function RichEditor({
 
     const mentionConfig = useMemo(() => {
         const memberList = members ?? [];
+        const escapeHtml = (s: string) =>
+            s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         return {
             items: ({ query }: { query: string }) =>
                 memberList
@@ -91,8 +94,11 @@ export default function RichEditor({
                         .map(
                             (item, i) =>
                                 `<button type="button" class="flex items-center gap-2 w-full text-left px-2 py-1.5 text-sm rounded bg-background hover:bg-muted ${i === 0 ? 'bg-muted' : ''}" data-index="${i}">
-                                    <div class="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-medium shrink-0">${item.name.charAt(0).toUpperCase()}</div>
-                                    <span>${item.name}</span>
+                                    <span class="relative w-5 h-5 shrink-0 inline-flex">
+                                        <span class="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-medium">${escapeHtml(item.name.charAt(0).toUpperCase())}</span>
+                                        ${item.avatarUrl ? `<img src="${item.avatarUrl.replace(/"/g, '&quot;')}" alt="" class="absolute inset-0 w-5 h-5 rounded-full object-cover" onerror="this.remove()" />` : ''}
+                                    </span>
+                                    <span>${escapeHtml(item.name)}</span>
                                 </button>`,
                         )
                         .join('');
@@ -200,12 +206,16 @@ export default function RichEditor({
         return () => dom.removeEventListener('paste', handlePaste);
     }, [editor, onImageUpload]);
 
+    const [linkModalOpen, setLinkModalOpen] = useState(false);
+
     const setLink = useCallback(() => {
-        const prev = editor?.getAttributes('link').href;
-        const url = window.prompt('URL', prev ?? '');
-        if (url === null) return;
-        if (url === '') { editor?.chain().focus().extendMarkRange('link').unsetLink().run(); return; }
-        editor?.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+        setLinkModalOpen(true);
+    }, []);
+
+    const applyLink = useCallback((url: string) => {
+        if (url === '') { editor?.chain().focus().extendMarkRange('link').unsetLink().run(); }
+        else { editor?.chain().focus().extendMarkRange('link').setLink({ href: url }).run(); }
+        setLinkModalOpen(false);
     }, [editor]);
 
     const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -543,6 +553,15 @@ export default function RichEditor({
             </div>
 
             <EditorContent editor={editor} />
+            <PromptModal
+              open={linkModalOpen}
+              title="Link URL"
+              placeholder="https://…"
+              initialValue={editor?.getAttributes('link').href ?? ''}
+              confirmLabel="Apply"
+              onSubmit={applyLink}
+              onClose={() => setLinkModalOpen(false)}
+            />
         </div>
     );
 }

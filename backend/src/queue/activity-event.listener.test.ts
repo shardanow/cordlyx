@@ -116,4 +116,15 @@ describe('ActivityEventListener (unit)', () => {
       newValue: 'John Doe',
     }));
   });
+
+  it('should not throw when the queue is down (request path survives)', async () => {
+    const write = vi.fn(async () => {
+      throw new Error('connect ECONNREFUSED');
+    });
+    const listener = createListener({ write });
+    await expect(
+      listener.onItemCreated({ projectId: 'proj-1', item: { id: 'item-1', title: 'My Item' }, actorId: 'user-1' }),
+    ).resolves.toBeUndefined();
+    expect(write).toHaveBeenCalledTimes(1);
+  });
 });

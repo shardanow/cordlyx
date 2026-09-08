@@ -1,6 +1,8 @@
-import { pgTable, uuid, varchar, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, timestamp, integer } from 'drizzle-orm/pg-core';
 import { users } from './users.js';
 import { projects } from './projects.js';
+
+export const DEFAULT_API_KEY_RATE_LIMIT = 120;
 
 export const apiKeys = pgTable('api_keys', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -13,5 +15,6 @@ export const apiKeys = pgTable('api_keys', {
   keyPrefix: varchar('key_prefix', { length: 12 }).notNull(),
   expiresAt: timestamp('expires_at'),
   lastUsedAt: timestamp('last_used_at'),
+  rateLimitPerMin: integer('rate_limit_per_min').notNull().default(DEFAULT_API_KEY_RATE_LIMIT),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });

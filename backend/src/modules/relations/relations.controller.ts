@@ -1,7 +1,8 @@
 import { Controller, Get, Post, Delete, Param, Body, UseGuards, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { JwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
+import { ApiKeyOrJwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
+import { assertItemInProject } from '../../common/assert-item.js';
 import { RelationsService } from './relations.service.js';
 import { createRelationSchema } from '@cordlyx/shared';
 import { getDb } from '../../database/client.js';
@@ -9,7 +10,7 @@ import { items } from '../../database/schema/items.js';
 import { eq } from 'drizzle-orm';
 
 @Controller('projects/:projectSlug/items/:itemId/relations')
-@UseGuards(JwtAuthGuard, ProjectMembershipGuard)
+@UseGuards(ApiKeyOrJwtAuthGuard, ProjectMembershipGuard)
 export class RelationsController {
   constructor(
     private readonly relationsService: RelationsService,
@@ -17,7 +18,8 @@ export class RelationsController {
   ) {}
 
   @Get()
-  async list(@Param('itemId') itemId: string) {
+  async list(@Req() req: Request, @Param('itemId') itemId: string) {
+    await assertItemInProject(req.projectId as string, itemId);
     return this.relationsService.getByItem(itemId);
   }
 
@@ -32,6 +34,7 @@ export class RelationsController {
   ) {
     const db = getDb();
     const data = createRelationSchema.parse(body);
+    await assertItemInProject(req.projectId as string, itemId);
     const relation = await this.relationsService.create(itemId, data.targetItemId, data.relationType, req.projectId as string);
     const [targetItem] = await db
       .select({ title: items.title, sequenceNum: items.sequenceNum })
@@ -58,7 +61,8 @@ export class RelationsController {
     @Req() req: Request,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const result = await this.relationsService.delete(id);
+    await assertItemInProject(req.projectId as string, itemId);
+    const result = await this.relationsService.delete(id, req.projectId as string);
     this.eventEmitter.emit('relation.deleted', {
       projectId: req.projectId,
       itemId,

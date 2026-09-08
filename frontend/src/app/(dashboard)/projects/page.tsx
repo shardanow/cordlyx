@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { FolderOpen, Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import CreateProjectModal from '@/components/CreateProjectModal';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 
 interface Project {
   id: string;
@@ -25,6 +26,7 @@ export default function ProjectsPage() {
   const queryClient = useQueryClient();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
   const [search, setSearch] = useState('');
   const router = useRouter();
 
@@ -37,13 +39,14 @@ export default function ProjectsPage() {
   };
 
   const handleDelete = async (project: Project) => {
-    if (!confirm(`Delete "${project.name}"? This will permanently remove all associated data.`)) return;
     try {
       await api.delete(`/projects/${project.slug}`);
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast.success('Project deleted');
     } catch {
       toast.error('Failed to delete project');
+    } finally {
+      setDeleteTarget(null);
     }
   };
 
@@ -146,7 +149,7 @@ export default function ProjectsPage() {
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
                 <button
-                  onClick={() => handleDelete(project)}
+                  onClick={() => setDeleteTarget(project)}
                   className="h-7 w-7 grid place-items-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                   title="Delete project"
                 >
@@ -157,6 +160,14 @@ export default function ProjectsPage() {
           ))}
         </div>
       )}
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title={`Delete "${deleteTarget?.name ?? ''}"?`}
+        message="This will permanently remove all associated data."
+        confirmLabel="Delete"
+        onConfirm={() => deleteTarget && void handleDelete(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

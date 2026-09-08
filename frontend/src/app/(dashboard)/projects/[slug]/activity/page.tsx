@@ -7,6 +7,7 @@ import { api } from '@/lib/api-client';
 import { useParams } from 'next/navigation';
 import { Select, SelectTrigger, SelectContent, SelectOption } from '@/components/ui/select';
 import { RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
+import { AvatarCircle } from '@/components/features/AvatarCircle';
 
 interface ActivityItem {
   id: string;
@@ -204,9 +205,7 @@ export default function ActivityPage() {
               <div className="absolute left-[11px] top-8 bottom-0 w-px bg-border" />
             )}
 
-            <div className="shrink-0 w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-medium mt-0.5 z-10">
-              {activity.actor?.name?.charAt(0) ?? '?'}
-            </div>
+            <AvatarCircle name={activity.actor?.name ?? '?'} avatarUrl={activity.actor?.avatarUrl} className="w-6 h-6 text-[10px] mt-0.5 z-10" />
 
             <div className="flex-1 min-w-0">
               <div className="text-sm">

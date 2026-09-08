@@ -10,12 +10,12 @@ import {
   Req,
 } from '@nestjs/common';
 import { Request } from 'express';
-import { JwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole } from '../../common/index.js';
+import { ApiKeyOrJwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole } from '../../common/index.js';
 import { ProjectMembersService } from './project-members.service.js';
 import { addMemberSchema, updateMemberSchema } from '@cordlyx/shared';
 
 @Controller('projects/:projectSlug/members')
-@UseGuards(JwtAuthGuard, ProjectMembershipGuard)
+@UseGuards(ApiKeyOrJwtAuthGuard, ProjectMembershipGuard)
 export class ProjectMembersController {
   constructor(private readonly membersService: ProjectMembersService) {}
 
