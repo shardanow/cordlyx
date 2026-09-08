@@ -126,7 +126,7 @@ cordlyx/
 ## 4. Guards Chain
 
 ```
-ThrottlerGuard (global, 60 req/min, 10 req/min on auth)
+ThrottlerGuard (global, 60 req/min, isolated auth bucket 10 req/min on login/register)
   └─ JwtAuthGuard (validates Bearer JWT, sets request.user)
        └─ ApiKeyOrJwtAuthGuard (accepts JWT or X-API-Key header)
        └─ AdminGuard (checks email against ADMIN_EMAILS env)
@@ -142,8 +142,8 @@ Role hierarchy: viewer(1) < member(2) < admin(3)
 
 ### Auth
 ```
-POST   /api/v1/auth/register           # Create account (throttled: 10/min)
-POST   /api/v1/auth/login              # Email + password → { accessToken, refreshToken } (10/min)
+POST   /api/v1/auth/register           # Create account (isolated auth bucket: 10/min)
+POST   /api/v1/auth/login              # Email + password → { accessToken, refreshToken } (auth bucket: 10/min)
 POST   /api/v1/auth/refresh            # Rotate refresh token (unthrottled)
 PATCH  /api/v1/auth/change-password    # Change current password (JWT)
 ```

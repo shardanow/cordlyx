@@ -35,7 +35,8 @@ test.describe('Item lifecycle', () => {
 
     // Should redirect to item detail page
     await expect(page).toHaveURL(/\/items\/\d+/, { timeout: 10000 });
-    await expect(page.getByText(TITLE).first()).toBeVisible({ timeout: 5000 });
+    // Title appears in sidebar/breadcrumb/list too — assert the detail h1
+    await expect(page.getByRole('heading', { name: TITLE })).toBeVisible({ timeout: 5000 });
   });
 
   test('should show item in list view after creation', async ({ page }) => {
@@ -60,8 +61,8 @@ test.describe('Item lifecycle', () => {
     await page.getByRole('button', { name: /^Create$/ }).click();
     await expect(page).toHaveURL(/\/items\/\d+/, { timeout: 10000 });
 
-    // Go back to list
-    await page.getByRole('link', { name: /list/i }).click();
+    // Go back to list (exact name: the sidebar item sub-link also contains "List")
+    await page.getByRole('link', { name: 'Items List', exact: true }).click();
     await expect(page).toHaveURL(/\/projects\/demo$/);
     await expect(page.getByText(title).first()).toBeVisible({ timeout: 5000 });
   });

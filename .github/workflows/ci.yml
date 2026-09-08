@@ -113,9 +113,10 @@ jobs:
       DATABASE_URL: postgres://cordlyx:cordlyx@localhost:5432/cordlyx
       REDIS_URL: redis://localhost:6379/0
       JWT_SECRET: ci-e2e-secret-32-chars-long-for-tests!
-      # Relax auth brute-force throttle for e2e: every UI test logs in from
-      # the same runner IP, bursting past the prod default (10/min).
+      # Relax throttles for e2e: every UI test navigates from the same
+      # runner IP with heavy prefetch bursts (past the prod defaults).
       LOGIN_RATE_LIMIT: 200
+      THROTTLE_LIMIT: 1000
       PORT: 4000
       NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
 

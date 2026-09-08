@@ -11,8 +11,11 @@ import { ApiKeysService } from '../../modules/api-keys/api-keys.service.js';
 
 /**
  * Requests/min budget: the key's own limit when resolved, else the default.
+ * Overridable via THROTTLE_LIMIT (load testing / e2e headroom); prod default 60.
  */
 export function apiKeyLimit(context: ExecutionContext): number {
+  const override = Number.parseInt(process.env.THROTTLE_LIMIT ?? '', 10);
+  if (Number.isFinite(override) && override > 0) return override;
   return context.switchToHttp().getRequest().apiKeyRateLimit ?? 60;
 }
 
