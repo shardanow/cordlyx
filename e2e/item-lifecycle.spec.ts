@@ -35,7 +35,7 @@ test.describe('Item lifecycle', () => {
 
     // Should redirect to item detail page
     await expect(page).toHaveURL(/\/items\/\d+/, { timeout: 10000 });
-    await expect(page.getByText(TITLE)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(TITLE).first()).toBeVisible({ timeout: 5000 });
   });
 
   test('should show item in list view after creation', async ({ page }) => {
@@ -63,7 +63,7 @@ test.describe('Item lifecycle', () => {
     // Go back to list
     await page.getByRole('link', { name: /list/i }).click();
     await expect(page).toHaveURL(/\/projects\/demo$/);
-    await expect(page.getByText(title)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(title).first()).toBeVisible({ timeout: 5000 });
   });
 
   test('should add and delete a comment on an item', async ({ page }) => {
@@ -83,23 +83,24 @@ test.describe('Item lifecycle', () => {
     await firstItemLink.click();
     await expect(page).toHaveURL(/\/items\/\d+/);
 
-    // Add a comment
+    // Add a comment (comment form is a collapsed RichEditor button)
     const commentText = `E2E comment ${Date.now()}`;
-    await page.getByPlaceholder('Write a comment...').fill(commentText);
-    await page.getByRole('button', { name: /comment/i }).click();
-    await expect(page.getByText(commentText)).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: 'Write a comment...', exact: true }).click();
+    await page.locator('.ProseMirror').fill(commentText);
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(page.getByText(commentText).first()).toBeVisible({ timeout: 5000 });
 
     // Edit the comment
-    await page.getByRole('button', { name: /edit/i }).first().click();
+    await page.getByTitle('Edit comment').first().click();
     const editedText = `${commentText} edited`;
-    await page.getByPlaceholder('Write a comment...').fill(editedText);
+    await page.locator('.ProseMirror').fill(editedText);
     // Look for Save button which appears during edit
-    await page.getByRole('button', { name: /save/i }).click();
-    await expect(page.getByText(editedText)).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText(editedText).first()).toBeVisible({ timeout: 5000 });
 
-    // Delete the comment
-    await page.getByRole('button', { name: /delete/i }).first().click();
-    await expect(page.getByText(editedText)).not.toBeVisible({ timeout: 3000 });
+    // Delete the comment (no confirm dialog — direct delete + toast)
+    await page.getByTitle('Delete comment').first().click();
+    await expect(page.getByText(editedText)).not.toBeVisible({ timeout: 5000 });
   });
 
   test('should toggle tags on an item', async ({ page }) => {

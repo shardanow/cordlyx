@@ -28,12 +28,12 @@ test.describe('Item detail', () => {
   test('should open comment form and add a comment', async ({ page }) => {
     await loginAndOpenItem(page);
 
-    const commentPlaceholder = page.getByPlaceholder('Write a comment...');
-    if (await commentPlaceholder.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await commentPlaceholder.fill(`E2E detail comment ${Date.now()}`);
-      await page.getByRole('button', { name: /send|comment/i }).click();
-      await page.waitForTimeout(500);
-    }
+    // Comment form is a collapsed RichEditor button (no input placeholder)
+    await page.getByRole('button', { name: 'Write a comment...', exact: true }).click();
+    const editor = page.locator('.ProseMirror');
+    await editor.fill(`E2E detail comment ${Date.now()}`);
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await page.waitForTimeout(500);
   });
 
   test('should show attachments section', async ({ page }) => {

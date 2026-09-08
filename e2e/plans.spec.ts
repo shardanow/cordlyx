@@ -90,6 +90,8 @@ test.describe('Plans', () => {
     // Confirm dialog closes only after a successful delete
     await expect(confirm).not.toBeVisible({ timeout: 5000 });
 
+    // Reload for a fresh list — kills any stale-query race after delete
+    await page.reload();
     await expect(page.getByText(planName)).not.toBeVisible({ timeout: 5000 });
   });
 });

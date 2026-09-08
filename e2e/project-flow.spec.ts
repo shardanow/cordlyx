@@ -90,7 +90,8 @@ test.describe('Project flow', () => {
     // her email, including a hidden mobile copy)
     const main = page.locator('main');
     await expect(main.getByText('alice@example.com')).toBeVisible({ timeout: 5000 });
-    // Admin role badge or text should be visible
-    await expect(main.getByText(/admin/i).first()).toBeVisible();
+    // Alice's own row renders a lowercase "admin" span; other rows render an
+    // "Admin" <option> inside a <select> (hidden) — exact match skips those
+    await expect(main.getByText('admin', { exact: true })).toBeVisible({ timeout: 5000 });
   });
 });
