@@ -30,18 +30,18 @@ cleanup() {
 }
 trap cleanup EXIT
 
-psql -v ON_ERROR_STOP=1 -q "$SCRATCH_URL" -f "$DUMP_FILE" > /dev/null
+psql "$SCRATCH_URL" -v ON_ERROR_STOP=1 -q -f "$DUMP_FILE" > /dev/null
 echo "[VERIFY] Restore OK"
 
 fail=0
 check() {
     local label="$1"; shift
     local result
-    result=$(psql -tAc "$SCRATCH_URL" "$@" 2>&1) || { echo "[VERIFY] FAIL: $label (query error: $result)"; fail=1; return; }
+    result=$(psql "$SCRATCH_URL" -tAc "$@" 2>&1) || { echo "[VERIFY] FAIL: $label (query error: $result)"; fail=1; return; }
     echo "[VERIFY] $label: $result"
 }
 
-TABLES=$(psql -tAc "$SCRATCH_URL" "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';")
+TABLES=$(psql "$SCRATCH_URL" -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public';")
 echo "[VERIFY] public tables: $TABLES"
 if [ "${TABLES:-0}" -lt 20 ]; then echo "[VERIFY] FAIL: expected >= 20 tables"; fail=1; fi
 
@@ -51,10 +51,10 @@ check "projects" "SELECT COUNT(*) FROM projects;"
 check "items" "SELECT COUNT(*) FROM items WHERE deleted_at IS NULL;"
 
 if [ "${EXPECT_SEEDED:-0}" = "1" ]; then
-    DEMO=$(psql -tAc "$SCRATCH_URL" "SELECT COUNT(*) FROM projects WHERE slug = 'demo';")
+    DEMO=$(psql "$SCRATCH_URL" -tAc "SELECT COUNT(*) FROM projects WHERE slug = 'demo';")
     echo "[VERIFY] demo project rows: $DEMO"
     if [ "${DEMO:-0}" -lt 1 ]; then echo "[VERIFY] FAIL: seed data missing (no demo project)"; fail=1; fi
-    SEEDUSERS=$(psql -tAc "$SCRATCH_URL" "SELECT COUNT(*) FROM users;")
+    SEEDUSERS=$(psql "$SCRATCH_URL" -tAc "SELECT COUNT(*) FROM users;")
     if [ "${SEEDUSERS:-0}" -lt 2 ]; then echo "[VERIFY] FAIL: seed data missing (< 2 users)"; fail=1; fi
 fi
 

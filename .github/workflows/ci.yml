@@ -75,7 +75,7 @@ jobs:
         env:
           DATABASE_URL: postgres://cordlyx:cordlyx@localhost:5432/cordlyx_test
           REDIS_URL: redis://localhost:6379/0
-          JWT_SECRET: ci-test-secret
+          JWT_SECRET: ci-test-secret-32-chars-long-for-tests
 
       - name: Build
         run: npm run build
@@ -112,7 +112,7 @@ jobs:
     env:
       DATABASE_URL: postgres://cordlyx:cordlyx@localhost:5432/cordlyx
       REDIS_URL: redis://localhost:6379/0
-      JWT_SECRET: ci-e2e-secret
+      JWT_SECRET: ci-e2e-secret-32-chars-long-for-tests!
       PORT: 4000
       NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
 
