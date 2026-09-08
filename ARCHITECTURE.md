@@ -637,7 +637,12 @@ Backend tests use a separate `cordlyx_test` database (defined in `backend/.env.t
 23. WebSocket real-time updates — Socket.IO gateway
 24. Redis caching — membership (30 min), config (1 h)
 25. Health endpoint — GET /health returns { status: ok|degraded, checks: { postgres, redis, queue(waiting/active/failed/delayed, failedAboveThreshold>100) } }; HTTP 503 when degraded, excluded from Swagger and rate limiting
-26. OpenAPI docs — Swagger UI at /api/docs, JSON at /api/docs-json (@nestjs/swagger, jwt + api-key schemes)
+26. OpenAPI docs — Swagger UI at /api/docs, JSON at /api/docs-json (@nestjs/swagger, jwt + api-key schemes).
+    Convention (single source of truth): request shapes come from the shared Zod
+    schemas via `backend/src/common/swagger/` helpers (`ApiZodBody`, `ApiZodQuery`,
+    `ApiProjectSlugParam`, `ApiErrorResponses`) — never hand-duplicated. Every new
+    endpoint ships with summary + params/body + responses (enforced by review
+    checklist + arch test); `postman/` is regenerated from the live spec.
 27. Project snapshots — full export/import (config+plans+items+relations+roadmaps, seq remap, merge or new project) + Settings → Data hub UI
 28. Overview dashboard (stats aggregation) + server-side shared/default views + email digests/mute + ETag/sync
 26. Dark mode — next-themes

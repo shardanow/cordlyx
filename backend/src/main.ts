@@ -7,6 +7,31 @@ import { AppModule } from './app.module.js';
 import { AllExceptionsFilter } from './common/index.js';
 import helmet from 'helmet';
 
+// Tag groups with descriptions for the Swagger sidebar.
+const SWAGGER_TAGS: Array<{ name: string; description: string }> = [
+  { name: 'Auth', description: 'Register, login, token rotation. Public except logout/change-password.' },
+  { name: 'Users', description: 'Own profile, user search (member picker), avatar, account deletion.' },
+  { name: 'projects', description: 'Projects, members, saved views, stats, config (types/statuses/priorities), sync, snapshots.' },
+  { name: 'ProjectMembers', description: 'Project membership and roles (admin only).' },
+  { name: 'project-config', description: 'Per-project vocabulary: item types, statuses, priorities (+ JSON template transfer).' },
+  { name: 'items', description: 'Issues/tasks: CRUD, filters, bulk, CSV/JSON import/export, votes, duplicates check.' },
+  { name: 'Board', description: 'Kanban board columns + drag-and-drop moves.' },
+  { name: 'QuickCreate', description: 'One-shot item creation from any context (needs project slug).' },
+  { name: 'comments', description: 'Threaded comments with @mentions and emoji reactions.' },
+  { name: 'Reactions', description: 'Emoji reactions on comments.' },
+  { name: 'Tags', description: 'Project tag vocabulary + toggling tags on items.' },
+  { name: 'attachments', description: 'File uploads (MIME + magic-byte validated, 10 MB max).' },
+  { name: 'Relations', description: 'Typed links between items (blocks, depends_on, relates_to, duplicates, child_of, next_action).' },
+  { name: 'Activities', description: 'Project and item activity timelines.' },
+  { name: 'Search', description: 'Full-text search across accessible items.' },
+  { name: 'plans', description: 'Plans (releases/milestones) + bulk/import/export.' },
+  { name: 'roadmaps', description: 'Roadmaps with lanes, scheduling, bulk/import/export.' },
+  { name: 'api-keys', description: 'Manage personal API keys (secret shown once at creation). JWT only.' },
+  { name: 'notifications', description: 'Inbox, unread counts, per-project prefs, email digests.' },
+  { name: 'Admin', description: 'Server administration (server admins only). JWT only.' },
+  { name: 'webhooks', description: 'Project webhooks with signing secret and delivery log (admin only).' },
+];
+
 const DELETED_PLACEHOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
   <rect width="400" height="300" fill="#f3f4f6" rx="8"/>
   <g fill="#9ca3af" transform="translate(200,120)">
@@ -48,13 +73,29 @@ async function bootstrap() {
 
   // OpenAPI docs (Swagger UI at /api/docs, raw JSON at /api/docs-json).
   // Served directly on the HTTP adapter, so the global api/v1 prefix does not apply.
+  // Request schemas come from the shared Zod schemas (single source of truth)
+  // via backend/src/common/swagger helpers — never hand-duplicated.
   const swaggerConfig = new DocumentBuilder()
     .setTitle('CordLyx API')
     .setDescription(
-      'Project-management API: items (create, bulk, import, export), comments, plans, roadmaps, webhooks. ' +
-        'Authenticate with either "Authorization: Bearer <jwt>" or the "X-API-Key: clx_..." header.',
+      'Project-management API: items (create, bulk, import, export), comments, plans, roadmaps, webhooks.\n\n' +
+        '## Authentication\n' +
+        'Click **Authorize** and fill ONE scheme: `api-key` with an `X-API-Key: clx_...` value ' +
+        '(Profile → API Keys), or `jwt` with `Authorization: Bearer <accessToken>` ' +
+        '(from `POST /auth/login`). Every locked endpoint accepts either one.\n\n' +
+        '## Typical flow (copy-paste ids between calls)\n' +
+        '1. `POST /auth/register` (or login) → Authorize.\n' +
+        '2. `POST /projects` → note the `slug`.\n' +
+        '3. `GET /projects/{slug}/types|statuses|priorities` → note the ids.\n' +
+        '4. `POST /projects/{slug}/items` with `title` + `typeId` → note `sequenceNum`.\n' +
+        '5. Open `/projects/{slug}/items/{sequenceNum}` — comments, tags, attachments, relations.\n\n' +
+        '## Conventions\n' +
+        '- Cursor pagination: `?limit=` + `meta.cursor` → next page `?cursor=`.\n' +
+        '- Errors share one envelope: `{ statusCode, error, message, requestId, timestamp }`.\n' +
+        '- Rate limits: 120 req/min per IP/key (auth endpoints: isolated 10 req/min bucket). ' +
+        'Over-limit answers are `429` with a `Retry-After` header.',
     )
-    .setVersion('1.0')
+    .setVersion('0.1.0')
     .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'jwt')
     .addApiKey({ type: 'apiKey', in: 'header', name: 'X-API-Key' }, 'api-key')
     // Every endpoint accepts either scheme (OR). Public auth endpoints
@@ -62,7 +103,9 @@ async function bootstrap() {
     .addSecurityRequirements('jwt')
     .addSecurityRequirements('api-key')
     .build();
+  // Tag groups with descriptions (addTag() in this swagger version takes no options).
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
+  swaggerDocument.tags = SWAGGER_TAGS;
   SwaggerModule.setup('api/docs', app, swaggerDocument);
   app.enableCors({
     origin: process.env.NODE_ENV === 'production' ? process.env.CORS_ORIGIN : ['http://localhost:3000'],

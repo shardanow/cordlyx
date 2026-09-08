@@ -1,10 +1,13 @@
 import { Controller, Post, Delete, Param, Body, UseGuards, Req } from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags, ApiParam } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ApiKeyOrJwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
+import { ApiZodBody, ApiProjectSlugParam, ApiUuidParam, ApiErrorResponses } from '../../common/index.js';
 import { ReactionsService } from './reactions.service.js';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { addReactionSchema } from '@cordlyx/shared';
 
+@ApiTags('Reactions')
 @Controller('projects/:projectSlug/items/:itemId/comments/:commentId/reactions')
 @UseGuards(ApiKeyOrJwtAuthGuard, ProjectMembershipGuard)
 export class ReactionsController {
@@ -14,6 +17,13 @@ export class ReactionsController {
   ) {}
 
   @Post()
+  @ApiOperation({ summary: 'Add an emoji reaction to a comment' })
+  @ApiProjectSlugParam()
+  @ApiUuidParam('itemId', 'Item id.')
+  @ApiUuidParam('commentId', 'Comment id.')
+  @ApiZodBody(addReactionSchema)
+  @ApiResponse({ status: 201, description: '{ success: true }.' })
+  @ApiErrorResponses(400, 401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
   async add(
@@ -36,6 +46,13 @@ export class ReactionsController {
   }
 
   @Delete(':reaction')
+  @ApiOperation({ summary: 'Remove your emoji reaction from a comment' })
+  @ApiProjectSlugParam()
+  @ApiUuidParam('itemId', 'Item id.')
+  @ApiUuidParam('commentId', 'Comment id.')
+  @ApiParam({ name: 'reaction', description: 'Emoji reaction, URL-encoded.', example: '%F0%9F%91%8D' })
+  @ApiResponse({ status: 200, description: '{ success: true }.' })
+  @ApiErrorResponses(401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
   async remove(

@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "CordLyx API",
-    "description": "Generated from OpenAPI 1.0. Set baseUrl/jwt/apiKey variables to call.",
+    "description": "Generated from OpenAPI 0.1.0. Set baseUrl/jwt/apiKey variables to call.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -52,6 +52,15 @@
               ],
               "query": []
             },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"string\",\n  \"email\": \"string\",\n  \"password\": \"string\",\n  \"name\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
             "description": "Create account"
           },
           "response": []
@@ -86,7 +95,16 @@
               ],
               "query": []
             },
-            "description": "Login"
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"login\": \"string\",\n  \"password\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Login with username or email"
           },
           "response": []
         },
@@ -119,6 +137,15 @@
                 "refresh"
               ],
               "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "description": "Rotate refresh token"
           },
@@ -154,7 +181,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Revoke a refresh token and log out"
           },
           "response": []
         },
@@ -188,7 +215,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"string\",\n  \"newPassword\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Change current password"
           },
           "response": []
         }
@@ -227,7 +263,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Get current user profile"
           },
           "response": []
         },
@@ -261,7 +297,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"avatarUrl\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Update your profile (name, avatar)"
           },
           "response": []
         },
@@ -295,7 +340,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Delete your account (irreversible)"
           },
           "response": []
         },
@@ -331,12 +376,12 @@
                 {
                   "key": "q",
                   "value": "",
-                  "description": "",
+                  "description": "Search text.",
                   "disabled": false
                 }
               ]
             },
-            "description": ""
+            "description": "Search users by name or email (member picker)"
           },
           "response": []
         },
@@ -371,7 +416,18 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": null,
+                  "description": "Upload .csv / .json / .jsonl (max 10 MB)"
+                }
+              ]
+            },
+            "description": "Upload your avatar (JPEG/PNG/GIF/WebP, 5 MB max)"
           },
           "response": []
         }
@@ -409,7 +465,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"slug\": \"string\",\n  \"description\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Create a project (you become its admin)"
           },
           "response": []
         },
@@ -442,7 +507,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "List my projects (member of, not archived)"
           },
           "response": []
         },
@@ -476,7 +541,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Get one project by slug"
           },
           "response": []
         },
@@ -510,7 +575,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"slug\": \"string\",\n  \"description\": null,\n  \"isArchived\": true,\n  \"settings\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Update project settings (admin only)"
           },
           "response": []
         },
@@ -544,7 +618,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Archive a project (admin only)"
           },
           "response": []
         },
@@ -579,7 +653,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Create a one-time invite link (admin only, 7-day expiry)"
           },
           "response": []
         },
@@ -613,7 +687,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Preview an invite (project name, inviter)"
           },
           "response": []
         },
@@ -648,7 +722,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Accept an invite (join the project as member)"
           },
           "response": []
         },
@@ -670,7 +744,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/projects/:projectSlug/sync",
+              "raw": "{{baseUrl}}/api/v1/projects/:projectSlug/sync?since=&limit=",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -681,7 +755,20 @@
                 ":projectSlug",
                 "sync"
               ],
-              "query": []
+              "query": [
+                {
+                  "key": "since",
+                  "value": "",
+                  "description": "",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
             },
             "description": "Incremental sync: items touched after ?since=ISO (deleted included as stubs)"
           },
@@ -757,14 +844,14 @@
                 {
                   "key": "dedupe",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Skip rows already present (default true).",
+                  "disabled": true
                 },
                 {
                   "key": "dryRun",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Preview without writes; returns what would happen (default false).",
+                  "disabled": true
                 }
               ]
             },
@@ -816,26 +903,26 @@
                 {
                   "key": "slug",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Slug for the new project.",
+                  "disabled": true
                 },
                 {
                   "key": "name",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Display name for the new project.",
+                  "disabled": true
                 },
                 {
                   "key": "dedupe",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Skip rows already present (default true).",
+                  "disabled": true
                 },
                 {
                   "key": "dryRun",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Preview without writes; returns what would happen (default false).",
+                  "disabled": true
                 }
               ]
             },
@@ -955,6 +1042,15 @@
               ],
               "query": []
             },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"filters\": {\n    \"typeId\": null,\n    \"statusId\": null,\n    \"priorityId\": null,\n    \"assigneeId\": null,\n    \"planId\": null,\n    \"search\": \"string\"\n  },\n  \"isShared\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
             "description": "Save a filter view (personal, optionally shared)"
           },
           "response": []
@@ -990,6 +1086,15 @@
                 ":id"
               ],
               "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"filters\": {\n    \"typeId\": null,\n    \"statusId\": null,\n    \"priorityId\": null,\n    \"assigneeId\": null,\n    \"planId\": null,\n    \"search\": \"string\"\n  },\n  \"isShared\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "description": "Rename / edit filters / share (owner or admin)"
           },
@@ -1104,7 +1209,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "List project members with roles"
           },
           "response": []
         },
@@ -1139,7 +1244,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"00000000-0000-0000-0000-000000000001\",\n  \"email\": \"string\",\n  \"role\": \"admin\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Add a member by userId or email (admin only)"
           },
           "response": []
         },
@@ -1175,7 +1289,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"admin\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Change a member role (admin only)"
           },
           "response": []
         },
@@ -1211,7 +1334,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Remove a member (admin only)"
           },
           "response": []
         }
@@ -1251,7 +1374,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "List item types"
           },
           "response": []
         },
@@ -1286,7 +1409,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"color\": \"string\",\n  \"icon\": null,\n  \"sortOrder\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Create an item type (admin only)"
           },
           "response": []
         },
@@ -1322,7 +1454,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"color\": \"string\",\n  \"icon\": null,\n  \"sortOrder\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Update an item type (admin only, partial)"
           },
           "response": []
         },
@@ -1358,7 +1499,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Delete an item type (admin only)"
           },
           "response": []
         },
@@ -1393,7 +1534,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "List item statuses"
           },
           "response": []
         },
@@ -1428,7 +1569,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"color\": \"string\",\n  \"category\": \"inbox\",\n  \"sortOrder\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Create an item status (admin only)"
           },
           "response": []
         },
@@ -1464,7 +1614,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"color\": \"string\",\n  \"category\": \"inbox\",\n  \"sortOrder\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Update an item status (admin only, partial)"
           },
           "response": []
         },
@@ -1500,7 +1659,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Delete an item status (admin only)"
           },
           "response": []
         },
@@ -1535,7 +1694,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "List item priorities"
           },
           "response": []
         },
@@ -1570,7 +1729,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"color\": null,\n  \"icon\": null,\n  \"sortOrder\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Create an item priority (admin only)"
           },
           "response": []
         },
@@ -1606,7 +1774,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"color\": null,\n  \"icon\": null,\n  \"sortOrder\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Update an item priority (admin only, partial)"
           },
           "response": []
         },
@@ -1642,7 +1819,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Delete an item priority (admin only)"
           },
           "response": []
         },
@@ -1716,8 +1893,8 @@
                 {
                   "key": "dryRun",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Preview without writes; returns what would happen (default false).",
+                  "disabled": true
                 }
               ]
             },
@@ -1759,7 +1936,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/projects/:projectSlug/items",
+              "raw": "{{baseUrl}}/api/v1/projects/:projectSlug/items?cursor=&limit=&typeId=&statusId=&priorityId=&assigneeId=&reporterId=&tagIds=&parentId=&planId=&search=&sort=",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -1770,7 +1947,80 @@
                 ":projectSlug",
                 "items"
               ],
-              "query": []
+              "query": [
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "typeId",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "statusId",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "priorityId",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "assigneeId",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "reporterId",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "tagIds",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "parentId",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "planId",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "sort",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
             },
             "description": "List items (cursor pagination, filters). Supports If-None-Match/ETag."
           },
@@ -1807,7 +2057,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"string\",\n  \"description\": null,\n  \"typeId\": \"00000000-0000-0000-0000-000000000001\",\n  \"statusId\": \"00000000-0000-0000-0000-000000000001\",\n  \"priorityId\": \"00000000-0000-0000-0000-000000000001\",\n  \"assigneeId\": null,\n  \"parentId\": null,\n  \"dueDate\": null,\n  \"startDate\": null,\n  \"estimatedHours\": null,\n  \"tagIds\": [\n    \"00000000-0000-0000-0000-000000000001\"\n  ],\n  \"planId\": null,\n  \"roadmapId\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Create one item (sequence number assigned automatically)"
           },
           "response": []
         },
@@ -1845,8 +2104,8 @@
                 {
                   "key": "format",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Export format (default csv).",
+                  "disabled": true
                 }
               ]
             },
@@ -1888,16 +2147,25 @@
                 {
                   "key": "dedupe",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Skip rows already present (default true).",
+                  "disabled": true
                 },
                 {
                   "key": "dryRun",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Preview without writes; returns what would happen (default false).",
+                  "disabled": true
                 }
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    null\n  ],\n  \"dedupe\": true,\n  \"dryRun\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "description": "Create up to 100 items in one request (supports dedupe and dryRun)"
           },
@@ -1937,14 +2205,14 @@
                 {
                   "key": "dedupe",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Skip rows already present (default true).",
+                  "disabled": true
                 },
                 {
                   "key": "dryRun",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Preview without writes; returns what would happen (default false).",
+                  "disabled": true
                 }
               ]
             },
@@ -1995,7 +2263,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Get one item by its sequence number"
           },
           "response": []
         },
@@ -2031,7 +2299,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Find existing items with a similar title (quick-create helper)"
           },
           "response": []
         },
@@ -2068,7 +2345,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Clone an item (new sequence number, same content)"
           },
           "response": []
         },
@@ -2104,7 +2381,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"string\",\n  \"description\": null,\n  \"typeId\": \"00000000-0000-0000-0000-000000000001\",\n  \"statusId\": \"00000000-0000-0000-0000-000000000001\",\n  \"priorityId\": \"00000000-0000-0000-0000-000000000001\",\n  \"assigneeId\": null,\n  \"parentId\": null,\n  \"dueDate\": null,\n  \"startDate\": null,\n  \"estimatedHours\": null,\n  \"tagIds\": [\n    \"00000000-0000-0000-0000-000000000001\"\n  ],\n  \"planId\": null,\n  \"roadmapId\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Update item fields (partial)"
           },
           "response": []
         },
@@ -2140,7 +2426,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Soft-delete an item"
           },
           "response": []
         },
@@ -2177,7 +2463,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Toggle your vote on an item"
           },
           "response": []
         },
@@ -2214,7 +2500,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "List votes on an item"
           },
           "response": []
         }
@@ -2254,7 +2540,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Get Kanban board (columns with items)"
           },
           "response": []
         },
@@ -2290,7 +2576,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"statusId\": \"00000000-0000-0000-0000-000000000001\",\n  \"sortOrder\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Move an item (drag-and-drop: status + order)"
           },
           "response": []
         }
@@ -2328,7 +2623,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"string\",\n  \"typeId\": \"00000000-0000-0000-0000-000000000001\",\n  \"projectSlug\": \"string\",\n  \"statusId\": \"00000000-0000-0000-0000-000000000001\",\n  \"planId\": null,\n  \"description\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Quick-create one item (project resolved from body slug, member+ required)"
           },
           "response": []
         }
@@ -2368,7 +2672,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "List project plans"
           },
           "response": []
         },
@@ -2403,7 +2707,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"type\": \"release\",\n  \"description\": \"string\",\n  \"color\": \"string\",\n  \"status\": \"active\",\n  \"sortOrder\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Create a plan"
           },
           "response": []
         },
@@ -2439,7 +2752,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"type\": \"release\",\n  \"description\": \"string\",\n  \"color\": \"string\",\n  \"status\": \"active\",\n  \"sortOrder\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Update a plan (partial)"
           },
           "response": []
         },
@@ -2475,7 +2797,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Delete a plan"
           },
           "response": []
         },
@@ -2513,8 +2835,8 @@
                 {
                   "key": "format",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Export format (default csv).",
+                  "disabled": true
                 }
               ]
             },
@@ -2556,16 +2878,25 @@
                 {
                   "key": "dedupe",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Skip rows already present (default true).",
+                  "disabled": true
                 },
                 {
                   "key": "dryRun",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Preview without writes; returns what would happen (default false).",
+                  "disabled": true
                 }
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    null\n  ],\n  \"dedupe\": true,\n  \"dryRun\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "description": "Create up to 100 plans in one request (supports dedupe and dryRun)"
           },
@@ -2605,14 +2936,14 @@
                 {
                   "key": "dedupe",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Skip rows already present (default true).",
+                  "disabled": true
                 },
                 {
                   "key": "dryRun",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Preview without writes; returns what would happen (default false).",
+                  "disabled": true
                 }
               ]
             },
@@ -2654,7 +2985,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/projects/:projectSlug/roadmaps",
+              "raw": "{{baseUrl}}/api/v1/projects/:projectSlug/roadmaps?sort=&search=",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -2665,9 +2996,22 @@
                 ":projectSlug",
                 "roadmaps"
               ],
-              "query": []
+              "query": [
+                {
+                  "key": "sort",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
             },
-            "description": ""
+            "description": "List project roadmaps (filter, sort)"
           },
           "response": []
         },
@@ -2702,7 +3046,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"description\": null,\n  \"startDate\": \"string\",\n  \"endDate\": \"string\",\n  \"color\": null,\n  \"sortOrder\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Create a roadmap"
           },
           "response": []
         },
@@ -2740,8 +3093,8 @@
                 {
                   "key": "format",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Export format (default json).",
+                  "disabled": true
                 }
               ]
             },
@@ -2818,7 +3171,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Get one roadmap with lanes"
           },
           "response": []
         },
@@ -2854,7 +3207,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"description\": null,\n  \"startDate\": \"string\",\n  \"endDate\": \"string\",\n  \"color\": null,\n  \"sortOrder\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Update a roadmap (partial)"
           },
           "response": []
         },
@@ -2890,7 +3252,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Delete a roadmap"
           },
           "response": []
         },
@@ -2927,7 +3289,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Get a roadmap with its scheduled items"
           },
           "response": []
         },
@@ -2964,7 +3326,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Get relations between items on a roadmap"
           },
           "response": []
         },
@@ -3002,14 +3364,14 @@
                 {
                   "key": "dedupe",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Skip rows already present (default true).",
+                  "disabled": true
                 },
                 {
                   "key": "dryRun",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Preview without writes; returns what would happen (default false).",
+                  "disabled": true
                 }
               ]
             },
@@ -3061,7 +3423,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"icon\": null,\n  \"color\": null,\n  \"sortOrder\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Add a lane to a roadmap"
           },
           "response": []
         },
@@ -3098,6 +3469,15 @@
                 "reorder"
               ],
               "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"laneIds\": [\n    \"00000000-0000-0000-0000-000000000001\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "description": "Reorder lanes atomically (ordered lane ids)"
           },
@@ -3137,7 +3517,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"icon\": null,\n  \"color\": null,\n  \"sortOrder\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Update a lane (partial)"
           },
           "response": []
         },
@@ -3175,7 +3564,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Delete a lane (items stay unscheduled)"
           },
           "response": []
         },
@@ -3212,7 +3601,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"itemIds\": [\n    \"00000000-0000-0000-0000-000000000001\"\n  ],\n  \"laneId\": null,\n  \"startDate\": null,\n  \"dueDate\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Schedule items onto a roadmap with dates"
           },
           "response": []
         },
@@ -3250,7 +3648,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Unschedule an item from a roadmap"
           },
           "response": []
         },
@@ -3288,7 +3686,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"startDate\": null,\n  \"dueDate\": null,\n  \"laneId\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Update scheduled dates/lane of an item"
           },
           "response": []
         }
@@ -3330,7 +3737,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "List comments on an item (with replies and reactions)"
           },
           "response": []
         },
@@ -3367,7 +3774,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"body\": \"string\",\n  \"parentId\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Add a comment (or a reply via parentId, @mentions notify)"
           },
           "response": []
         },
@@ -3405,7 +3821,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"body\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Edit your comment"
           },
           "response": []
         },
@@ -3443,7 +3868,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Delete your comment"
           },
           "response": []
         }
@@ -3487,7 +3912,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reaction\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Add an emoji reaction to a comment"
           },
           "response": []
         },
@@ -3527,7 +3961,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Remove your emoji reaction from a comment"
           },
           "response": []
         }
@@ -3567,7 +4001,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "List project tags"
           },
           "response": []
         },
@@ -3602,7 +4036,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"color\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Create a tag"
           },
           "response": []
         },
@@ -3638,7 +4081,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"color\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Update a tag (partial)"
           },
           "response": []
         },
@@ -3674,7 +4126,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Delete a tag (admin only)"
           },
           "response": []
         }
@@ -3716,7 +4168,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "List attachments of an item"
           },
           "response": []
         },
@@ -3753,7 +4205,18 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": null,
+                  "description": "Upload .csv / .json / .jsonl (max 10 MB)"
+                }
+              ]
+            },
+            "description": "Upload a file attachment (MIME + magic-byte validated, 10 MB max)"
           },
           "response": []
         },
@@ -3791,7 +4254,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Delete an attachment (shows a placeholder on the item)"
           },
           "response": []
         }
@@ -3833,7 +4296,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "List relations of an item"
           },
           "response": []
         },
@@ -3870,7 +4333,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetItemId\": \"00000000-0000-0000-0000-000000000001\",\n  \"relationType\": \"blocks\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Relate an item to another item in the same project"
           },
           "response": []
         },
@@ -3908,7 +4380,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Delete a relation"
           },
           "response": []
         }
@@ -3935,7 +4407,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/projects/:projectSlug/activity",
+              "raw": "{{baseUrl}}/api/v1/projects/:projectSlug/activity?cursor=&limit=&actorId=&action=&itemId=&sort=&dateFrom=&dateTo=",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -3946,9 +4418,58 @@
                 ":projectSlug",
                 "activity"
               ],
-              "query": []
+              "query": [
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "actorId",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "action",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "itemId",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "sort",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "dateFrom",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "dateTo",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
             },
-            "description": ""
+            "description": "Project activity timeline (cursor pagination, filters)"
           },
           "response": []
         },
@@ -3970,7 +4491,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/projects/:projectSlug/items/:itemId/activity",
+              "raw": "{{baseUrl}}/api/v1/projects/:projectSlug/items/:itemId/activity?itemId=&cursor=&limit=&actorId=&action=&sort=&dateFrom=&dateTo=",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -3983,9 +4504,58 @@
                 ":itemId",
                 "activity"
               ],
-              "query": []
+              "query": [
+                {
+                  "key": "itemId",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "actorId",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "action",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "sort",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "dateFrom",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "dateTo",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
             },
-            "description": ""
+            "description": "Activity timeline of one item"
           },
           "response": []
         }
@@ -4012,7 +4582,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/search",
+              "raw": "{{baseUrl}}/api/v1/search?cursor=&limit=&q=&projectId=",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -4021,9 +4591,34 @@
                 "v1",
                 "search"
               ],
-              "query": []
+              "query": [
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "q",
+                  "value": "",
+                  "description": "",
+                  "disabled": false
+                },
+                {
+                  "key": "projectId",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                }
+              ]
             },
-            "description": ""
+            "description": "Full-text search across accessible items"
           },
           "response": []
         }
@@ -4061,7 +4656,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "List my API keys (secret hashes never exposed)"
           },
           "response": []
         },
@@ -4094,7 +4689,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"projectId\": \"00000000-0000-0000-0000-000000000001\",\n  \"expiresAt\": \"2026-01-01T00:00:00.000Z\",\n  \"rateLimitPerMin\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Create an API key (secret returned once — store it)"
           },
           "response": []
         },
@@ -4128,7 +4732,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"string\",\n  \"rateLimitPerMin\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Rename a key or change its budget (1–10000 req/min)"
           },
           "response": []
         },
@@ -4162,7 +4775,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Revoke an API key immediately"
           },
           "response": []
         }
@@ -4202,18 +4815,18 @@
                 {
                   "key": "cursor",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Pagination cursor.",
+                  "disabled": true
                 },
                 {
                   "key": "limit",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Page size 1–100 (default 50).",
+                  "disabled": true
                 }
               ]
             },
-            "description": ""
+            "description": "List my notifications, newest first (cursor pagination)"
           },
           "response": []
         },
@@ -4247,7 +4860,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "List my unread notifications"
           },
           "response": []
         },
@@ -4282,7 +4895,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Count my unread notifications (badge)"
           },
           "response": []
         },
@@ -4317,7 +4930,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Mark one notification as read"
           },
           "response": []
         },
@@ -4351,7 +4964,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Mark all my notifications as read"
           },
           "response": []
         },
@@ -4419,6 +5032,15 @@
                 ":projectSlug"
               ],
               "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"muted\": true,\n  \"emailDigest\": true,\n  \"digestHour\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "description": "Mute / digest settings for one project (self)"
           },
@@ -4492,8 +5114,8 @@
                 {
                   "key": "hour",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "UTC hour 0–23 (default: current hour).",
+                  "disabled": true
                 }
               ]
             },
@@ -4536,7 +5158,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Check whether the current user is a server admin"
           },
           "response": []
         },
@@ -4570,7 +5192,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Server-wide stats (users, projects, items)"
           },
           "response": []
         },
@@ -4604,7 +5226,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "List all users (server admin)"
           },
           "response": []
         },
@@ -4640,7 +5262,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Promote a user to server admin"
           },
           "response": []
         },
@@ -4676,7 +5298,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Deactivate a user (they can no longer log in)"
           },
           "response": []
         },
@@ -4710,7 +5332,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "List all projects (server admin)"
           },
           "response": []
         },
@@ -4746,7 +5368,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "List members of any project (server admin)"
           },
           "response": []
         },
@@ -4784,7 +5406,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Change any membership role (server admin)"
           },
           "response": []
         },
@@ -4820,7 +5451,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Archive any project (server admin)"
           },
           "response": []
         },
@@ -4855,7 +5486,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Delete any project (server admin, irreversible)"
           },
           "response": []
         },
@@ -4891,18 +5522,18 @@
                 {
                   "key": "cursor",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Pagination cursor.",
+                  "disabled": true
                 },
                 {
                   "key": "limit",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Page size 1–100 (default 50).",
+                  "disabled": true
                 }
               ]
             },
-            "description": ""
+            "description": "Server-wide activity (server admin, cursor pagination)"
           },
           "response": []
         }
@@ -4976,6 +5607,15 @@
                 "webhooks"
               ],
               "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"string\",\n  \"events\": [\n    \"item.created\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "description": "Create webhook (returns signing secret once — store it)"
           },
@@ -5053,8 +5693,8 @@
                 {
                   "key": "limit",
                   "value": "",
-                  "description": "",
-                  "disabled": false
+                  "description": "Max deliveries (default 50).",
+                  "disabled": true
                 }
               ]
             },
@@ -5094,7 +5734,16 @@
               ],
               "query": []
             },
-            "description": ""
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"string\",\n  \"events\": [\n    \"item.created\"\n  ],\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Update a webhook (URL, events, active flag)"
           },
           "response": []
         },
@@ -5130,7 +5779,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Delete a webhook"
           },
           "response": []
         }

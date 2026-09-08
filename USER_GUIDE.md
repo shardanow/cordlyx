@@ -548,6 +548,51 @@ Interactive OpenAPI documentation (Swagger UI) is served by the backend:
 - UI: `http://localhost:4000/api/docs` (dev) or `https://your-domain/api/docs` (prod, via nginx)
 - Raw OpenAPI JSON: `http://localhost:4000/api/docs-json`
 
+Every endpoint documents its parameters, body, and responses there — start from the
+intro at the top of the Swagger page. The 5-minute path below mirrors
+`e2e/api-contract.spec.ts`, so it is covered by CI and never rots.
+
+### API quickstart (QA, 5 minutes)
+
+```bash
+BASE=http://localhost:4000/api/v1   # prod: https://your-domain/api/v1
+
+# 1. Register (or POST /auth/login for an existing user)
+curl -s -X POST $BASE/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"qa1","email":"qa1@test.com","password":"password123","name":"QA"}'
+# → {"accessToken":"...","refreshToken":"..."}
+
+export JWT=<accessToken from above>
+
+# 2. Create a project → note the slug
+curl -s -X POST $BASE/projects \
+  -H "Authorization: Bearer $JWT" -H 'Content-Type: application/json' \
+  -d '{"name":"QA Project","slug":"qa-project"}'
+
+# 3. Read config ids (names are NOT accepted — only ids)
+curl -s $BASE/projects/qa-project/types -H "Authorization: Bearer $JWT"
+# → [{"id":"<TYPE_ID>","name":"Task",...}, ...]
+export TYPE_ID=<id of "Task">
+
+# 4. Create an item → note sequenceNum
+curl -s -X POST $BASE/projects/qa-project/items \
+  -H "Authorization: Bearer $JWT" -H 'Content-Type: application/json' \
+  -d "{\"title\":\"QA item\",\"typeId\":\"$TYPE_ID\"}"
+# → {"id":"...","sequenceNum":1,...}
+
+# 5. Read it back, comment, list board
+curl -s $BASE/projects/qa-project/items/1 -H "Authorization: Bearer $JWT"
+curl -s -X POST $BASE/projects/qa-project/items/<ITEM_ID>/comments \
+  -H "Authorization: Bearer $JWT" -H 'Content-Type: application/json' \
+  -d '{"body":"looks good"}'
+curl -s "$BASE/projects/qa-project/items?limit=50&sort=-created_at" -H "Authorization: Bearer $JWT"
+```
+
+Prefer API keys over pasting JWTs: Profile → API Keys (or `POST /api-keys`),
+then `-H "X-API-Key: clx_..."` instead of `Authorization: Bearer`. Keys carry
+their own 120 req/min budget (editable 1–10000); need `member`+ role in the project.
+
 A full endpoint reference also lives in `ARCHITECTURE.md` (section 5). Item payloads follow the Zod schemas in `packages/shared/src/schemas/index.ts` (`createItemSchema`, `updateItemSchema`).
 
 **Authentication (either works on all project endpoints):**

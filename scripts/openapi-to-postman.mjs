@@ -45,7 +45,7 @@ function exampleFor(schema = {}) {
   switch (schema.type) {
     case 'string':
       if (schema.format === 'uuid') return '00000000-0000-0000-0000-000000000001';
-      if (schema.format === 'date-time') return new Date().toISOString();
+      if (schema.format === 'date-time') return '2026-01-01T00:00:00.000Z'; // fixed: keeps output deterministic for drift checks
       if (schema.format === 'date') return '2026-01-01';
       if (schema.format === 'binary') return null;
       return 'string';

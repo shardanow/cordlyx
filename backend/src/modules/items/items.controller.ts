@@ -19,6 +19,19 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiResponse, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { ApiKeyOrJwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
+import {
+  ApiZodBody,
+  ApiZodQuery,
+  ApiProjectSlugParam,
+  ApiUuidParam,
+  ApiSequenceNumParam,
+  ApiDedupeQuery,
+  ApiDryRunQuery,
+  ApiExportFormatQuery,
+  ApiErrorResponses,
+  ApiListResponse,
+  ItemResponseDto,
+} from '../../common/index.js';
 import { ItemsService } from './items.service.js';
 import { VotesService } from './votes.service.js';
 import { ItemsImportService, bulkRequestSchema, IMPORT_MAX_BYTES } from './items-import.service.js';
@@ -48,6 +61,14 @@ export class ItemsController {
   @Get()
   @UseInterceptors(EtagInterceptor)
   @ApiOperation({ summary: 'List items (cursor pagination, filters). Supports If-None-Match/ETag.' })
+  @ApiProjectSlugParam()
+  @ApiZodQuery(itemFilterSchema)
+  @ApiListResponse('Items, newest first by default.', {
+    id: '00000000-0000-0000-0000-000000000001',
+    sequenceNum: 1,
+    title: 'Set up CI/CD pipeline',
+  })
+  @ApiErrorResponses(400, 401, 403, 404, 429)
   async list(@Req() req: Request, @Query() query: unknown) {
     const filters = itemFilterSchema.parse(query);
     return this.itemsService.list(req.projectId as string, filters);
@@ -56,7 +77,10 @@ export class ItemsController {
   @Get('export')
   @UseInterceptors(EtagInterceptor)
   @ApiOperation({ summary: 'Export project items as CSV, JSON or JSONL (?format=csv|json|jsonl)' })
+  @ApiProjectSlugParam()
+  @ApiExportFormatQuery()
   @ApiResponse({ status: 200, description: 'File download with Content-Disposition: attachment' })
+  @ApiErrorResponses(401, 403, 404, 429)
   async export(
     @Param('projectSlug') slug: string,
     @Req() req: Request,
@@ -80,7 +104,12 @@ export class ItemsController {
 
   @Post('bulk')
   @ApiOperation({ summary: 'Create up to 100 items in one request (supports dedupe and dryRun)' })
+  @ApiProjectSlugParam()
+  @ApiZodBody(bulkRequestSchema, 'Items array (or raw array, normalized server-side).')
+  @ApiDedupeQuery()
+  @ApiDryRunQuery()
   @ApiResponse({ status: 201, description: 'Per-item results: created | skipped | failed' })
+  @ApiErrorResponses(400, 401, 403, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
   async bulk(
@@ -109,6 +138,7 @@ export class ItemsController {
 
   @Post('import')
   @ApiOperation({ summary: 'Import items from a CSV, JSON or JSONL file (max 10 MB, 100 rows)' })
+  @ApiProjectSlugParam()
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -117,7 +147,10 @@ export class ItemsController {
       required: ['file'],
     },
   })
+  @ApiDedupeQuery()
+  @ApiDryRunQuery()
   @ApiResponse({ status: 201, description: 'Per-row results: created | skipped | failed' })
+  @ApiErrorResponses(400, 401, 403, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: IMPORT_MAX_BYTES } }))
@@ -152,6 +185,11 @@ export class ItemsController {
   }
 
   @Get(':sequenceNum')
+  @ApiOperation({ summary: 'Get one item by its sequence number' })
+  @ApiProjectSlugParam()
+  @ApiSequenceNumParam()
+  @ApiResponse({ status: 200, description: 'The item.', type: ItemResponseDto })
+  @ApiErrorResponses(400, 401, 403, 404, 429)
   async getBySequence(
     @Req() req: Request,
     @Param('sequenceNum', ParseIntPipe) sequenceNum: number,
@@ -165,6 +203,11 @@ export class ItemsController {
   }
 
   @Post()
+  @ApiOperation({ summary: 'Create one item (sequence number assigned automatically)' })
+  @ApiProjectSlugParam()
+  @ApiZodBody(createItemSchema)
+  @ApiResponse({ status: 201, description: 'The created item.', type: ItemResponseDto })
+  @ApiErrorResponses(400, 401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
   async create(
@@ -188,6 +231,14 @@ export class ItemsController {
   }
 
   @Post('check-duplicates')
+  @ApiOperation({ summary: 'Find existing items with a similar title (quick-create helper)' })
+  @ApiProjectSlugParam()
+  @ApiBody({
+    description: 'Title to compare; empty title returns an empty list.',
+    schema: { type: 'object', properties: { title: { type: 'string' } } },
+  })
+  @ApiResponse({ status: 200, description: '{ duplicates: [{ id, sequenceNum, title }] } (max 5).' })
+  @ApiErrorResponses(401, 403, 429)
   async checkDuplicates(@Req() req: Request, @Body() body: { title?: string }) {
     if (!body.title?.trim()) return { duplicates: [] };
     try {
@@ -208,6 +259,11 @@ export class ItemsController {
   }
 
   @Post(':id/clone')
+  @ApiOperation({ summary: 'Clone an item (new sequence number, same content)' })
+  @ApiProjectSlugParam()
+  @ApiUuidParam('id', 'Item id to clone.')
+  @ApiResponse({ status: 201, description: 'The cloned item.', type: ItemResponseDto })
+  @ApiErrorResponses(401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
   async clone(
@@ -221,6 +277,12 @@ export class ItemsController {
   }
 
   @Patch(':id')
+  @ApiOperation({ summary: 'Update item fields (partial)' })
+  @ApiProjectSlugParam()
+  @ApiUuidParam('id', 'Item id to update.')
+  @ApiZodBody(updateItemSchema)
+  @ApiResponse({ status: 200, description: 'The updated item.', type: ItemResponseDto })
+  @ApiErrorResponses(400, 401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
   async update(
@@ -353,6 +415,11 @@ export class ItemsController {
   }
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Soft-delete an item' })
+  @ApiProjectSlugParam()
+  @ApiUuidParam('id', 'Item id to delete.')
+  @ApiResponse({ status: 200, description: 'Deletion result.' })
+  @ApiErrorResponses(401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
   async delete(
@@ -366,6 +433,11 @@ export class ItemsController {
   }
 
   @Post(':id/vote')
+  @ApiOperation({ summary: 'Toggle your vote on an item' })
+  @ApiProjectSlugParam()
+  @ApiUuidParam('id', 'Item id to vote on.')
+  @ApiResponse({ status: 201, description: '{ voted: true | false }.' })
+  @ApiErrorResponses(401, 403, 404, 429)
   async toggleVote(
     @Param('id') id: string,
     @Req() req: Request,
@@ -379,6 +451,11 @@ export class ItemsController {
   }
 
   @Get(':id/votes')
+  @ApiOperation({ summary: 'List votes on an item' })
+  @ApiProjectSlugParam()
+  @ApiUuidParam('id', 'Item id.')
+  @ApiResponse({ status: 200, description: 'Vote list.' })
+  @ApiErrorResponses(401, 403, 404, 429)
   async getVotes(@Req() req: Request, @Param('id') id: string) {
     await assertItemInProject(req.projectId as string, id);
     return this.votesService.getVotes(id);
