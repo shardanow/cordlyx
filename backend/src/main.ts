@@ -57,6 +57,10 @@ async function bootstrap() {
     .setVersion('1.0')
     .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'jwt')
     .addApiKey({ type: 'apiKey', in: 'header', name: 'X-API-Key' }, 'api-key')
+    // Every endpoint accepts either scheme (OR). Public auth endpoints
+    // opt out per-operation via @ApiOperation({ security: [] }).
+    .addSecurityRequirements('jwt')
+    .addSecurityRequirements('api-key')
     .build();
   const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, swaggerDocument);

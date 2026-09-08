@@ -5,18 +5,21 @@ Generated from OpenAPI. `BASE=http://localhost:4000/api/v1`, `AUTH="Authorizatio
 ## Auth
 
 ### POST /auth/register
+Create account
 
 ```bash
 curl -X POST "$BASE/auth/register" -H "$AUTH"
 ```
 
 ### POST /auth/login
+Login
 
 ```bash
 curl -X POST "$BASE/auth/login" -H "$AUTH"
 ```
 
 ### POST /auth/refresh
+Rotate refresh token
 
 ```bash
 curl -X POST "$BASE/auth/refresh" -H "$AUTH"

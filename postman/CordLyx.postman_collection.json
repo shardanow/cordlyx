@@ -52,7 +52,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Create account"
           },
           "response": []
         },
@@ -86,7 +86,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Login"
           },
           "response": []
         },
@@ -120,7 +120,7 @@
               ],
               "query": []
             },
-            "description": ""
+            "description": "Rotate refresh token"
           },
           "response": []
         },

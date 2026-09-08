@@ -1,4 +1,5 @@
 import { Controller, Post, Patch, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { ApiOperation } from '@nestjs/swagger';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { JwtAuthGuard, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
 import { AuthService } from './auth.service.js';
@@ -16,6 +17,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
+  @ApiOperation({ summary: 'Create account', security: [] })
   @SkipThrottle({ default: true })
   @Throttle({ auth: { ttl: 60000, limit: authThrottleLimit } })
   async register(@Body() body: unknown) {
@@ -25,6 +27,7 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login', security: [] })
   @SkipThrottle({ default: true })
   @Throttle({ auth: { ttl: 60000, limit: authThrottleLimit } })
   async login(@Body() body: unknown) {
@@ -34,6 +37,7 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Rotate refresh token', security: [] })
   @SkipThrottle()
   async refresh(@Body() body: unknown) {
     const data = refreshSchema.parse(body);
