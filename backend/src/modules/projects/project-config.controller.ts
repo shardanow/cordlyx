@@ -9,7 +9,9 @@ import {
   ApiUuidParam,
   ApiDryRunQuery,
   ApiErrorResponses,
-  ApiListResponse,
+  ItemTypeResponseDto,
+  ItemStatusResponseDto,
+  ItemPriorityResponseDto,
 } from '../../common/index.js';
 import { ProjectConfigService } from './project-config.service.js';
 import { ProjectConfigTransferService } from './project-config-transfer.service.js';
@@ -30,7 +32,7 @@ export class ProjectConfigController {
   @Get('types')
   @ApiOperation({ summary: 'List item types' })
   @ApiProjectSlugParam()
-  @ApiListResponse('Item types, e.g. Task / Bug / Feature.')
+  @ApiResponse({ status: 200, description: 'Item types (plain array).', type: ItemTypeResponseDto, isArray: true })
   @ApiErrorResponses(401, 403, 429)
   async getTypes(@Req() req: Request) {
     return this.configService.getTypes(req.projectId as string);
@@ -40,7 +42,7 @@ export class ProjectConfigController {
   @ApiOperation({ summary: 'Create an item type (admin only)' })
   @ApiProjectSlugParam()
   @ApiZodBody(createItemTypeSchema)
-  @ApiResponse({ status: 201, description: 'The created type.' })
+  @ApiResponse({ status: 201, description: 'The created type.', type: ItemTypeResponseDto })
   @ApiErrorResponses(400, 401, 403, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('admin')
@@ -54,7 +56,7 @@ export class ProjectConfigController {
   @ApiProjectSlugParam()
   @ApiUuidParam('id', 'Type id.')
   @ApiZodBody(createItemTypeSchema.partial())
-  @ApiResponse({ status: 200, description: 'The updated type.' })
+  @ApiResponse({ status: 200, description: 'The updated type.', type: ItemTypeResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('admin')
@@ -81,7 +83,7 @@ export class ProjectConfigController {
   @Get('statuses')
   @ApiOperation({ summary: 'List item statuses' })
   @ApiProjectSlugParam()
-  @ApiListResponse('Item statuses, e.g. To Do / In Progress / Done.')
+  @ApiResponse({ status: 200, description: 'Item statuses (plain array).', type: ItemStatusResponseDto, isArray: true })
   @ApiErrorResponses(401, 403, 429)
   async getStatuses(@Req() req: Request) {
     return this.configService.getStatuses(req.projectId as string);
@@ -91,7 +93,7 @@ export class ProjectConfigController {
   @ApiOperation({ summary: 'Create an item status (admin only)' })
   @ApiProjectSlugParam()
   @ApiZodBody(createItemStatusSchema)
-  @ApiResponse({ status: 201, description: 'The created status.' })
+  @ApiResponse({ status: 201, description: 'The created status.', type: ItemStatusResponseDto })
   @ApiErrorResponses(400, 401, 403, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('admin')
@@ -105,7 +107,7 @@ export class ProjectConfigController {
   @ApiProjectSlugParam()
   @ApiUuidParam('id', 'Status id.')
   @ApiZodBody(createItemStatusSchema.partial())
-  @ApiResponse({ status: 200, description: 'The updated status.' })
+  @ApiResponse({ status: 200, description: 'The updated status.', type: ItemStatusResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('admin')
@@ -132,7 +134,7 @@ export class ProjectConfigController {
   @Get('priorities')
   @ApiOperation({ summary: 'List item priorities' })
   @ApiProjectSlugParam()
-  @ApiListResponse('Item priorities, e.g. Critical / Medium / Low.')
+  @ApiResponse({ status: 200, description: 'Item priorities (plain array).', type: ItemPriorityResponseDto, isArray: true })
   @ApiErrorResponses(401, 403, 429)
   async getPriorities(@Req() req: Request) {
     return this.configService.getPriorities(req.projectId as string);
@@ -142,7 +144,7 @@ export class ProjectConfigController {
   @ApiOperation({ summary: 'Create an item priority (admin only)' })
   @ApiProjectSlugParam()
   @ApiZodBody(createItemPrioritySchema)
-  @ApiResponse({ status: 201, description: 'The created priority.' })
+  @ApiResponse({ status: 201, description: 'The created priority.', type: ItemPriorityResponseDto })
   @ApiErrorResponses(400, 401, 403, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('admin')
@@ -156,7 +158,7 @@ export class ProjectConfigController {
   @ApiProjectSlugParam()
   @ApiUuidParam('id', 'Priority id.')
   @ApiZodBody(createItemPrioritySchema.partial())
-  @ApiResponse({ status: 200, description: 'The updated priority.' })
+  @ApiResponse({ status: 200, description: 'The updated priority.', type: ItemPriorityResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('admin')

@@ -48,7 +48,9 @@ export function ApiErrorResponses(
 }
 
 /**
- * Documents a cursor-paginated list response: `{ data: [...], meta: { cursor? } }`.
+ * Documents a cursor-paginated list response: `{ data: [...], meta }`.
+ * Use ONLY for endpoints that really wrap (items, search, notifications,
+ * activities). Plain-array lists use `@ApiResponse({ isArray: true, type })`.
  * Pass a representative item example (docs-only, no runtime effect).
  */
 export function ApiListResponse(description: string, itemExample?: Record<string, unknown>) {
@@ -61,7 +63,11 @@ export function ApiListResponse(description: string, itemExample?: Record<string
         data: { type: 'array', items: { type: 'object', example: itemExample } },
         meta: {
           type: 'object',
-          properties: { cursor: { type: 'string', nullable: true } },
+          properties: {
+            cursor: { type: 'string', nullable: true, description: 'Pass as ?cursor for the next page.' },
+            hasMore: { type: 'boolean' },
+            limit: { type: 'integer' },
+          },
         },
       },
     },

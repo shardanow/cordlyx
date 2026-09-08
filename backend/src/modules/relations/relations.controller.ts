@@ -4,6 +4,7 @@ import { Request } from 'express';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ApiKeyOrJwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
 import { ApiZodBody, ApiProjectSlugParam, ApiUuidParam, ApiErrorResponses } from '../../common/index.js';
+import { RelationResponseDto } from '../../common/index.js';
 import { assertItemInProject } from '../../common/assert-item.js';
 import { RelationsService } from './relations.service.js';
 import { createRelationSchema } from '@cordlyx/shared';
@@ -24,7 +25,17 @@ export class RelationsController {
   @ApiOperation({ summary: 'List relations of an item' })
   @ApiProjectSlugParam()
   @ApiUuidParam('itemId', 'Item id.')
-  @ApiResponse({ status: 200, description: 'Relation list.' })
+  @ApiResponse({
+    status: 200,
+    description: '{ outgoing: [...], incoming: [...] } relations of the item.',
+    schema: {
+      type: 'object',
+      properties: {
+        outgoing: { type: 'array', items: { type: 'object' } },
+        incoming: { type: 'array', items: { type: 'object' } },
+      },
+    },
+  })
   @ApiErrorResponses(401, 403, 404, 429)
   async list(@Req() req: Request, @Param('itemId') itemId: string) {
     await assertItemInProject(req.projectId as string, itemId);
@@ -36,7 +47,7 @@ export class RelationsController {
   @ApiProjectSlugParam()
   @ApiUuidParam('itemId', 'Source item id.')
   @ApiZodBody(createRelationSchema)
-  @ApiResponse({ status: 201, description: 'The created relation.' })
+  @ApiResponse({ status: 201, description: 'The created relation.', type: RelationResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 409, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')

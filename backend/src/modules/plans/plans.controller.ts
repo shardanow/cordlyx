@@ -11,7 +11,7 @@ import {
   ApiDryRunQuery,
   ApiExportFormatQuery,
   ApiErrorResponses,
-  ApiListResponse,
+  PlanResponseDto,
 } from '../../common/index.js';
 import { PlansService } from './plans.service.js';
 import { PlansTransferService, plansBulkSchema } from './plans-transfer.service.js';
@@ -30,7 +30,7 @@ export class PlansController {
   @Get()
   @ApiOperation({ summary: 'List project plans' })
   @ApiProjectSlugParam()
-  @ApiListResponse('Plans, e.g. Sprint 1 / Q3 Release.')
+  @ApiResponse({ status: 200, description: 'Plan list (plain array).', type: PlanResponseDto, isArray: true })
   @ApiErrorResponses(401, 403, 429)
   async list(@Req() req: Request) {
     return this.plansService.list(req.projectId as string);
@@ -40,7 +40,7 @@ export class PlansController {
   @ApiOperation({ summary: 'Create a plan' })
   @ApiProjectSlugParam()
   @ApiZodBody(createPlanSchema)
-  @ApiResponse({ status: 201, description: 'The created plan.' })
+  @ApiResponse({ status: 201, description: 'The created plan.', type: PlanResponseDto })
   @ApiErrorResponses(400, 401, 403, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
@@ -54,7 +54,7 @@ export class PlansController {
   @ApiProjectSlugParam()
   @ApiUuidParam('id', 'Plan id.')
   @ApiZodBody(updatePlanSchema)
-  @ApiResponse({ status: 200, description: 'The updated plan.' })
+  @ApiResponse({ status: 200, description: 'The updated plan.', type: PlanResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')

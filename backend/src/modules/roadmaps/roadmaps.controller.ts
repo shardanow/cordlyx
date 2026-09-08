@@ -27,7 +27,8 @@ import {
   ApiDryRunQuery,
   ApiExportFormatQuery,
   ApiErrorResponses,
-  ApiListResponse,
+  RoadmapResponseDto,
+  RoadmapLaneResponseDto,
 } from '../../common/index.js';
 import { RoadmapsService } from './roadmaps.service.js';
 import { RoadmapsTransferService } from './roadmaps-transfer.service.js';
@@ -59,7 +60,7 @@ export class RoadmapsController {
   @ApiOperation({ summary: 'List project roadmaps (filter, sort)' })
   @ApiProjectSlugParam()
   @ApiZodQuery(roadmapFilterSchema)
-  @ApiListResponse('Roadmaps, e.g. Q3 Release.')
+  @ApiResponse({ status: 200, description: 'Roadmap list (plain array).', type: RoadmapResponseDto, isArray: true })
   @ApiErrorResponses(400, 401, 403, 429)
   async list(@Req() req: Request, @Query() query: unknown) {
     const filters = roadmapFilterSchema.parse(query);
@@ -111,7 +112,7 @@ export class RoadmapsController {
   @ApiOperation({ summary: 'Get one roadmap with lanes' })
   @ApiProjectSlugParam()
   @ApiUuidParam('id', 'Roadmap id.')
-  @ApiResponse({ status: 200, description: 'The roadmap.' })
+  @ApiResponse({ status: 200, description: 'The roadmap.', type: RoadmapResponseDto })
   @ApiErrorResponses(401, 403, 404, 429)
   async getById(@Req() req: Request, @Param('id') id: string) {
     const roadmap = await this.roadmapsService.getById(req.projectId as string, id);
@@ -146,7 +147,7 @@ export class RoadmapsController {
   @ApiOperation({ summary: 'Create a roadmap' })
   @ApiProjectSlugParam()
   @ApiZodBody(createRoadmapSchema)
-  @ApiResponse({ status: 201, description: 'The created roadmap.' })
+  @ApiResponse({ status: 201, description: 'The created roadmap.', type: RoadmapResponseDto })
   @ApiErrorResponses(400, 401, 403, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
@@ -191,7 +192,7 @@ export class RoadmapsController {
   @ApiProjectSlugParam()
   @ApiUuidParam('id', 'Roadmap id.')
   @ApiZodBody(updateRoadmapSchema)
-  @ApiResponse({ status: 200, description: 'The updated roadmap.' })
+  @ApiResponse({ status: 200, description: 'The updated roadmap.', type: RoadmapResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
@@ -219,7 +220,7 @@ export class RoadmapsController {
   @ApiProjectSlugParam()
   @ApiUuidParam('id', 'Roadmap id.')
   @ApiZodBody(createRoadmapLaneSchema)
-  @ApiResponse({ status: 201, description: 'The created lane.' })
+  @ApiResponse({ status: 201, description: 'The created lane.', type: RoadmapLaneResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')

@@ -3,6 +3,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ApiKeyOrJwtAuthGuard, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
 import { ApiZodBody, ApiErrorResponses } from '../../common/index.js';
+import { ItemResponseDto } from '../../common/index.js';
 import { ItemsService } from './items.service.js';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { quickCreateSchema } from '@cordlyx/shared';
@@ -25,7 +26,7 @@ export class QuickCreateController {
     summary: 'Quick-create one item (project resolved from body slug, member+ required)',
   })
   @ApiZodBody(quickCreateSchema)
-  @ApiResponse({ status: 201, description: 'The created item (with sequenceNum for redirect).' })
+  @ApiResponse({ status: 201, description: 'The created item (with sequenceNum for redirect).', type: ItemResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 429)
   async quickCreate(
     @CurrentUser() user: AuthenticatedUser,

@@ -10,6 +10,7 @@ import {
   ApiDryRunQuery,
   ApiErrorResponses,
   ApiListResponse,
+  ProjectResponseDto,
 } from '../../common/index.js';
 import { ProjectsService } from './projects.service.js';
 import { InvitesService } from './invites.service.js';
@@ -40,7 +41,7 @@ export class ProjectsController {  constructor(
   @Post('projects')
   @ApiOperation({ summary: 'Create a project (you become its admin)' })
   @ApiZodBody(createProjectSchema)
-  @ApiResponse({ status: 201, description: 'The created project.' })
+  @ApiResponse({ status: 201, description: 'The created project.', type: ProjectResponseDto })
   @ApiErrorResponses(400, 401, 409, 429)
   async create(@CurrentUser() user: AuthenticatedUser, @Body() body: unknown) {
     const data = createProjectSchema.parse(body);
@@ -49,7 +50,7 @@ export class ProjectsController {  constructor(
 
   @Get('projects')
   @ApiOperation({ summary: 'List my projects (member of, not archived)' })
-  @ApiListResponse('Projects the current user belongs to.')
+  @ApiResponse({ status: 200, description: 'Projects the current user belongs to (plain array).', type: ProjectResponseDto, isArray: true })
   @ApiErrorResponses(401, 429)
   async list(@CurrentUser() user: AuthenticatedUser) {
     return this.projectsService.listForUser(user.id);
@@ -58,7 +59,7 @@ export class ProjectsController {  constructor(
   @Get('projects/:projectSlug')
   @ApiOperation({ summary: 'Get one project by slug' })
   @ApiProjectSlugParam()
-  @ApiResponse({ status: 200, description: 'The project.' })
+  @ApiResponse({ status: 200, description: 'The project.', type: ProjectResponseDto })
   @ApiErrorResponses(401, 403, 404, 429)
   @UseGuards(ProjectMembershipGuard)
   async getBySlug(@Param('projectSlug') slug: string) {
@@ -71,7 +72,7 @@ export class ProjectsController {  constructor(
   @ApiOperation({ summary: 'Update project settings (admin only)' })
   @ApiProjectSlugParam()
   @ApiZodBody(updateProjectSchema)
-  @ApiResponse({ status: 200, description: 'The updated project.' })
+  @ApiResponse({ status: 200, description: 'The updated project.', type: ProjectResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 409, 429)
   @UseGuards(ProjectMembershipGuard, ProjectRoleGuard)
   @MinimumRole('admin')

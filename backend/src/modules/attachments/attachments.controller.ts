@@ -15,6 +15,7 @@ import { Request } from 'express';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ApiKeyOrJwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
 import { ApiProjectSlugParam, ApiUuidParam, ApiErrorResponses } from '../../common/index.js';
+import { AttachmentResponseDto } from '../../common/index.js';
 import { assertItemInProject } from '../../common/assert-item.js';
 import { AttachmentsService } from './attachments.service.js';
 
@@ -31,7 +32,7 @@ export class AttachmentsController {
   @ApiOperation({ summary: 'List attachments of an item' })
   @ApiProjectSlugParam()
   @ApiUuidParam('itemId', 'Item id.')
-  @ApiResponse({ status: 200, description: 'Attachment list.' })
+  @ApiResponse({ status: 200, description: 'Attachment list (plain array).', type: AttachmentResponseDto, isArray: true })
   @ApiErrorResponses(401, 403, 404, 429)
   async list(@Req() req: Request, @Param('itemId') itemId: string) {
     await assertItemInProject(req.projectId as string, itemId);
@@ -50,7 +51,7 @@ export class AttachmentsController {
       required: ['file'],
     },
   })
-  @ApiResponse({ status: 201, description: 'The created attachment.' })
+  @ApiResponse({ status: 201, description: 'The created attachment.', type: AttachmentResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')

@@ -10,6 +10,7 @@ import {
   type AuthenticatedUser,
 } from '../../common/index.js';
 import { ApiZodBody, ApiProjectSlugParam, ApiUuidParam, ApiErrorResponses } from '../../common/index.js';
+import { ViewResponseDto } from '../../common/index.js';
 import { ProjectViewsService, createViewSchema, updateViewSchema } from './project-views.service.js';
 
 @ApiTags('projects')
@@ -21,7 +22,7 @@ export class ProjectViewsController {
   @Get()
   @ApiOperation({ summary: 'List my views plus views shared with the project' })
   @ApiProjectSlugParam()
-  @ApiResponse({ status: 200, description: 'View list.' })
+  @ApiResponse({ status: 200, description: 'View list (plain array).', type: ViewResponseDto, isArray: true })
   @ApiErrorResponses(401, 403, 429)
   async list(@Req() req: Request, @CurrentUser() user: AuthenticatedUser) {
     return this.viewsService.list(req.projectId as string, user.id);
@@ -31,7 +32,7 @@ export class ProjectViewsController {
   @ApiOperation({ summary: 'Save a filter view (personal, optionally shared)' })
   @ApiProjectSlugParam()
   @ApiZodBody(createViewSchema)
-  @ApiResponse({ status: 201, description: 'The created view.' })
+  @ApiResponse({ status: 201, description: 'The created view.', type: ViewResponseDto })
   @ApiErrorResponses(400, 401, 403, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
@@ -45,7 +46,7 @@ export class ProjectViewsController {
   @ApiProjectSlugParam()
   @ApiUuidParam('id', 'View id.')
   @ApiZodBody(updateViewSchema)
-  @ApiResponse({ status: 200, description: 'The updated view.' })
+  @ApiResponse({ status: 200, description: 'The updated view.', type: ViewResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')

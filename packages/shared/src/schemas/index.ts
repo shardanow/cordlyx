@@ -67,8 +67,8 @@ export const updateProjectSchema = z.object({
 // --- Project Member ---
 
 export const addMemberSchema = z.object({
-  userId: z.string().uuid(),
-  email: z.string().email().optional(),
+  userId: z.string().uuid().describe('User id — from GET /users/search.'),
+  email: z.string().email().optional().describe('Alternative to userId: invite by email.'),
   role: z.enum(PROJECT_ROLES),
 });
 
@@ -104,27 +104,27 @@ export const createItemPrioritySchema = z.object({
 export const createItemSchema = z.object({
   title: z.string().min(1).max(500),
   description: z.string().max(100000).optional().nullable(),
-  typeId: z.string().uuid(),
-  statusId: z.string().uuid().optional(),
-  priorityId: z.string().uuid().optional(),
-  assigneeId: z.string().uuid().nullable().optional(),
-  parentId: z.string().uuid().nullable().optional(),
+  typeId: z.string().uuid().describe('Item type id — from GET /projects/{slug}/types.'),
+  statusId: z.string().uuid().optional().describe('Status id — from GET /projects/{slug}/statuses. Defaults to the inbox status.'),
+  priorityId: z.string().uuid().optional().describe('Priority id — from GET /projects/{slug}/priorities.'),
+  assigneeId: z.string().uuid().nullable().optional().describe('Assignee user id — from GET /projects/{slug}/members.'),
+  parentId: z.string().uuid().nullable().optional().describe('Parent item id, for subtasks.'),
   dueDate: z.string().datetime().nullable().optional(),
   startDate: z.string().datetime().nullable().optional(),
   estimatedHours: z.number().min(0).max(999999).nullable().optional(),
-  tagIds: z.array(z.string().uuid()).optional(),
-  planId: z.string().uuid().nullable().optional(),
-  roadmapId: z.string().uuid().nullable().optional(),
+  tagIds: z.array(z.string().uuid()).optional().describe('Tag ids — from GET /projects/{slug}/tags.'),
+  planId: z.string().uuid().nullable().optional().describe('Plan id — from GET /projects/{slug}/plans.'),
+  roadmapId: z.string().uuid().nullable().optional().describe('Roadmap id — from GET /projects/{slug}/roadmaps.'),
 });
 
 export const updateItemSchema = createItemSchema.partial();
 
 export const quickCreateSchema = z.object({
   title: z.string().min(1).max(500),
-  typeId: z.string().uuid(),
-  projectSlug: z.string().optional(),
+  typeId: z.string().uuid().describe('Item type id — from GET /projects/{slug}/types.'),
+  projectSlug: z.string().optional().describe('Target project slug (or X-Project-Slug header).'),
   statusId: z.string().uuid().optional(),
-  planId: z.string().uuid().optional(),
+  planId: z.string().uuid().nullable().optional(),
   description: z.string().optional(),
 });
 
@@ -146,7 +146,7 @@ export const createTagSchema = z.object({
 
 export const createCommentSchema = z.object({
   body: z.string().min(1).max(50000),
-  parentId: z.string().uuid().nullable().optional(),
+  parentId: z.string().uuid().nullable().optional().describe('Parent comment id, for threaded replies.'),
 });
 
 export const updateCommentSchema = z.object({
@@ -160,20 +160,21 @@ export const addReactionSchema = z.object({
 // --- Relation ---
 
 export const createRelationSchema = z.object({
-  targetItemId: z.string().uuid(),
+  targetItemId: z.string().uuid().describe('Target item id (same project). Find it via GET /projects/{slug}/items.'),
   relationType: z.enum(RELATION_TYPES),
 });
 
 // --- Pagination / Search ---
 
 export const paginationSchema = z.object({
-  cursor: z.string().optional(),
+  cursor: z.string().optional().describe('Opaque cursor from the previous page meta.'),
   limit: z.coerce
     .number()
     .int()
     .min(1)
     .max(PAGINATION_DEFAULTS.maxLimit)
-    .default(PAGINATION_DEFAULTS.limit),
+    .default(PAGINATION_DEFAULTS.limit)
+    .describe('Page size.'),
 });
 
 export const itemFilterSchema = paginationSchema.extend({
@@ -182,18 +183,19 @@ export const itemFilterSchema = paginationSchema.extend({
   priorityId: z.string().uuid().optional(),
   assigneeId: z.string().uuid().optional(),
   reporterId: z.string().uuid().optional(),
-  tagIds: z.string().optional(), // comma-separated
+  tagIds: z.string().optional().describe('Comma-separated tag ids.'),
   parentId: z.string().uuid().optional(),
   planId: z.string().uuid().optional(),
   search: z.string().max(500).optional(),
   sort: z
     .enum(['created_at', '-created_at', 'updated_at', '-updated_at', 'priority', '-priority', 'due_date', '-due_date', 'status', '-status', 'assignee', '-assignee'])
-    .default('-created_at'),
+    .default('-created_at')
+    .describe('Sort field, prefix with - for descending.'),
 });
 
 export const searchSchema = paginationSchema.extend({
-  q: z.string().min(1).max(500),
-  projectId: z.string().uuid().optional(),
+  q: z.string().min(1).max(500).describe('Full-text query.'),
+  projectId: z.string().uuid().optional().describe('Limit search to one project.'),
 });
 
 // --- Activity ---

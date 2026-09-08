@@ -1,7 +1,7 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiOperation } from '@nestjs/swagger';
 import { ApiKeyOrJwtAuthGuard, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
-import { ApiZodQuery, ApiErrorResponses } from '../../common/index.js';
+import { ApiZodQuery, ApiErrorResponses, ApiListResponse } from '../../common/index.js';
 import { SearchService } from './search.service.js';
 import { searchSchema } from '@cordlyx/shared';
 
@@ -13,7 +13,11 @@ export class SearchController {
   @Get()
   @ApiOperation({ summary: 'Full-text search across accessible items' })
   @ApiZodQuery(searchSchema)
-  @ApiResponse({ status: 200, description: 'Matching items, highest rank first (max `limit`).' })
+  @ApiListResponse('Matching items, highest rank first.', {
+    id: '00000000-0000-0000-0000-000000000001',
+    sequenceNum: 2,
+    title: 'Login page is broken on mobile',
+  })
   @ApiErrorResponses(400, 401, 429)
   async search(@Query() query: unknown, @CurrentUser() user: AuthenticatedUser) {
     const data = searchSchema.parse(query);

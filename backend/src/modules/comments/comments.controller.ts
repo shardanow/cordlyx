@@ -3,6 +3,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ApiKeyOrJwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
 import { ApiZodBody, ApiProjectSlugParam, ApiUuidParam, ApiErrorResponses } from '../../common/index.js';
+import { CommentResponseDto } from '../../common/index.js';
 import { assertItemInProject } from '../../common/assert-item.js';
 import { CommentsService } from './comments.service.js';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -21,7 +22,7 @@ export class CommentsController {
   @ApiOperation({ summary: 'List comments on an item (with replies and reactions)' })
   @ApiProjectSlugParam()
   @ApiUuidParam('itemId', 'Item id.')
-  @ApiResponse({ status: 200, description: 'Comment list.' })
+  @ApiResponse({ status: 200, description: 'Top-level comments with replies and reactions (plain array).', type: CommentResponseDto, isArray: true })
   @ApiErrorResponses(401, 403, 404, 429)
   async list(@Req() req: Request, @Param('itemId') itemId: string) {
     await assertItemInProject(req.projectId as string, itemId);
@@ -33,7 +34,7 @@ export class CommentsController {
   @ApiProjectSlugParam()
   @ApiUuidParam('itemId', 'Item id to comment on.')
   @ApiZodBody(createCommentSchema)
-  @ApiResponse({ status: 201, description: 'The created comment.' })
+  @ApiResponse({ status: 201, description: 'The created comment.', type: CommentResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
@@ -56,7 +57,7 @@ export class CommentsController {
   @ApiUuidParam('itemId', 'Item id.')
   @ApiUuidParam('commentId', 'Comment id.')
   @ApiZodBody(updateCommentSchema)
-  @ApiResponse({ status: 200, description: 'The updated comment.' })
+  @ApiResponse({ status: 200, description: 'The updated comment.', type: CommentResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')

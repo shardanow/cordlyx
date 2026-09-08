@@ -30,6 +30,7 @@ import {
   ApiExportFormatQuery,
   ApiErrorResponses,
   ApiListResponse,
+  ItemResponseDto,
 } from '../../common/index.js';
 import { ItemsService } from './items.service.js';
 import { VotesService } from './votes.service.js';
@@ -187,7 +188,7 @@ export class ItemsController {
   @ApiOperation({ summary: 'Get one item by its sequence number' })
   @ApiProjectSlugParam()
   @ApiSequenceNumParam()
-  @ApiResponse({ status: 200, description: 'The item.' })
+  @ApiResponse({ status: 200, description: 'The item.', type: ItemResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 429)
   async getBySequence(
     @Req() req: Request,
@@ -205,7 +206,7 @@ export class ItemsController {
   @ApiOperation({ summary: 'Create one item (sequence number assigned automatically)' })
   @ApiProjectSlugParam()
   @ApiZodBody(createItemSchema)
-  @ApiResponse({ status: 201, description: 'The created item.' })
+  @ApiResponse({ status: 201, description: 'The created item.', type: ItemResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
@@ -261,7 +262,7 @@ export class ItemsController {
   @ApiOperation({ summary: 'Clone an item (new sequence number, same content)' })
   @ApiProjectSlugParam()
   @ApiUuidParam('id', 'Item id to clone.')
-  @ApiResponse({ status: 201, description: 'The cloned item.' })
+  @ApiResponse({ status: 201, description: 'The cloned item.', type: ItemResponseDto })
   @ApiErrorResponses(401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
@@ -280,7 +281,7 @@ export class ItemsController {
   @ApiProjectSlugParam()
   @ApiUuidParam('id', 'Item id to update.')
   @ApiZodBody(updateItemSchema)
-  @ApiResponse({ status: 200, description: 'The updated item.' })
+  @ApiResponse({ status: 200, description: 'The updated item.', type: ItemResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')

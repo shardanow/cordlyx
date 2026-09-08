@@ -22,7 +22,10 @@ export class NotificationsController {
   @ApiOperation({ summary: 'List my notifications, newest first (cursor pagination)' })
   @ApiQuery({ name: 'cursor', required: false, description: 'Pagination cursor.' })
   @ApiQuery({ name: 'limit', required: false, description: 'Page size 1–100 (default 50).', schema: { type: 'integer', default: 50 } })
-  @ApiListResponse('Notifications.')
+  @ApiListResponse(
+    'Notifications.',
+    { id: '00000000-0000-0000-0000-000000000001', type: 'mention', readAt: null },
+  )
   @ApiErrorResponses(400, 401, 429)
   async list(
     @CurrentUser() user: AuthenticatedUser,

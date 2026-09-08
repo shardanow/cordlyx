@@ -3,6 +3,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { ApiKeyOrJwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole } from '../../common/index.js';
 import { ApiZodBody, ApiProjectSlugParam, ApiUuidParam, ApiErrorResponses } from '../../common/index.js';
+import { TagResponseDto } from '../../common/index.js';
 import { TagsService } from './tags.service.js';
 import { createTagSchema } from '@cordlyx/shared';
 
@@ -15,7 +16,7 @@ export class TagsController {
   @Get()
   @ApiOperation({ summary: 'List project tags' })
   @ApiProjectSlugParam()
-  @ApiResponse({ status: 200, description: 'Tag list.' })
+  @ApiResponse({ status: 200, description: 'Tag list (plain array).', type: TagResponseDto, isArray: true })
   @ApiErrorResponses(401, 403, 429)
   async list(@Req() req: Request) {
     return this.tagsService.list(req.projectId as string);
@@ -25,7 +26,7 @@ export class TagsController {
   @ApiOperation({ summary: 'Create a tag' })
   @ApiProjectSlugParam()
   @ApiZodBody(createTagSchema)
-  @ApiResponse({ status: 201, description: 'The created tag.' })
+  @ApiResponse({ status: 201, description: 'The created tag.', type: TagResponseDto })
   @ApiErrorResponses(400, 401, 403, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
@@ -39,7 +40,7 @@ export class TagsController {
   @ApiProjectSlugParam()
   @ApiUuidParam('id', 'Tag id.')
   @ApiZodBody(createTagSchema.partial())
-  @ApiResponse({ status: 200, description: 'The updated tag.' })
+  @ApiResponse({ status: 200, description: 'The updated tag.', type: TagResponseDto })
   @ApiErrorResponses(400, 401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')

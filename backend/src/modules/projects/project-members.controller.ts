@@ -12,7 +12,8 @@ import {
 import { Request } from 'express';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ApiKeyOrJwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole } from '../../common/index.js';
-import { ApiZodBody, ApiProjectSlugParam, ApiUuidParam, ApiErrorResponses, ApiListResponse } from '../../common/index.js';
+import { ApiZodBody, ApiProjectSlugParam, ApiUuidParam, ApiErrorResponses } from '../../common/index.js';
+import { MemberResponseDto } from '../../common/index.js';
 import { ProjectMembersService } from './project-members.service.js';
 import { addMemberSchema, updateMemberSchema } from '@cordlyx/shared';
 
@@ -25,7 +26,7 @@ export class ProjectMembersController {
   @Get()
   @ApiOperation({ summary: 'List project members with roles' })
   @ApiProjectSlugParam()
-  @ApiListResponse('Members with roles.', { name: 'Alice Johnson', email: 'alice@example.com', role: 'admin' })
+  @ApiResponse({ status: 200, description: 'Members with roles (plain array).', type: MemberResponseDto, isArray: true })
   @ApiErrorResponses(401, 403, 429)
   async list(@Req() req: Request) {
     return this.membersService.getMembers(req.projectId as string);

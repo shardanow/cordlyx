@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "CordLyx API",
-    "description": "Generated from OpenAPI 1.0. Set baseUrl/jwt/apiKey variables to call.",
+    "description": "Generated from OpenAPI 0.1.0. Set baseUrl/jwt/apiKey variables to call.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -2625,7 +2625,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"string\",\n  \"typeId\": \"00000000-0000-0000-0000-000000000001\",\n  \"projectSlug\": \"string\",\n  \"statusId\": \"00000000-0000-0000-0000-000000000001\",\n  \"planId\": \"00000000-0000-0000-0000-000000000001\",\n  \"description\": \"string\"\n}",
+              "raw": "{\n  \"title\": \"string\",\n  \"typeId\": \"00000000-0000-0000-0000-000000000001\",\n  \"projectSlug\": \"string\",\n  \"statusId\": \"00000000-0000-0000-0000-000000000001\",\n  \"planId\": null,\n  \"description\": \"string\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

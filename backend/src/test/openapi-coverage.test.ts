@@ -7,6 +7,7 @@ import { AppModule } from '../app.module.js';
 const PATH_METADATA = 'path';
 const OP_METADATA = 'swagger/apiOperation';
 const PARAMS_METADATA = 'swagger/apiParameters';
+const RESPONSE_METADATA = 'swagger/apiResponse';
 const EXCLUDE_CONTROLLER = 'swagger/apiExcludeController';
 const EXCLUDE_ENDPOINT = 'swagger/apiExcludeEndpoint';
 
@@ -81,6 +82,18 @@ function paramsOf(controllerName: string, methodName: string) {
   return (Reflect.getMetadata(PARAMS_METADATA, fn) as Array<{ name?: string }> | undefined) ?? [];
 }
 
+function responsesOf(controllerName: string, methodName: string) {
+  const controllers = moduleControllers([AppModule]);
+  const controller = controllers.find((c) => c.name === controllerName);
+  const fn = (controller?.prototype as Record<string, unknown> | undefined)?.[methodName];
+  if (typeof fn !== 'function') return {};
+  return (
+    (Reflect.getMetadata(RESPONSE_METADATA, fn) as
+      | Record<string, { description?: string; type?: unknown } | undefined>
+      | undefined) ?? {}
+  );
+}
+
 describe('OpenAPI coverage', () => {
   it('discovers the controller registry', () => {
     expect(moduleControllers([AppModule]).length).toBeGreaterThanOrEqual(20);
@@ -104,6 +117,17 @@ describe('OpenAPI coverage', () => {
       );
       for (const match of fullPath.matchAll(/:([A-Za-z0-9_]+)/g)) {
         if (!declared.has(match[1]!)) missing.push(`${handler} → :${match[1]}`);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it('every documented response has a description', () => {
+    const missing: string[] = [];
+    for (const { handler } of documentedRoutes()) {
+      const [controllerName, methodName] = handler.split('.') as [string, string];
+      for (const [status, res] of Object.entries(responsesOf(controllerName, methodName))) {
+        if (!res?.description?.trim()) missing.push(`${handler} → ${status}`);
       }
     }
     expect(missing).toEqual([]);

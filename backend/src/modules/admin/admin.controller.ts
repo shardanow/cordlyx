@@ -1,7 +1,8 @@
 import { Controller, Get, Patch, Delete, Param, Query, Body, UseGuards, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
 import { ApiOperation, ApiBody, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard, AdminGuard, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
-import { ApiUuidParam, ApiErrorResponses, ApiListResponse } from '../../common/index.js';
+import { ApiUuidParam, ApiErrorResponses } from '../../common/index.js';
+import { UserResponseDto, ProjectResponseDto, MemberResponseDto } from '../../common/index.js';
 import { AdminService } from './admin.service.js';
 
 @ApiTags('Admin')
@@ -30,7 +31,7 @@ export class AdminController {
 
   @Get('users')
   @ApiOperation({ summary: 'List all users (server admin)' })
-  @ApiListResponse('Users.')
+  @ApiResponse({ status: 200, description: 'Users (plain array).', type: UserResponseDto, isArray: true })
   @ApiErrorResponses(401, 403, 429)
   @UseGuards(JwtAuthGuard, AdminGuard)
   async listUsers() {
@@ -61,7 +62,7 @@ export class AdminController {
 
   @Get('projects')
   @ApiOperation({ summary: 'List all projects (server admin)' })
-  @ApiListResponse('Projects.')
+  @ApiResponse({ status: 200, description: 'Projects (plain array).', type: ProjectResponseDto, isArray: true })
   @ApiErrorResponses(401, 403, 429)
   @UseGuards(JwtAuthGuard, AdminGuard)
   async listProjects() {
@@ -71,7 +72,7 @@ export class AdminController {
   @Get('projects/:id/members')
   @ApiOperation({ summary: 'List members of any project (server admin)' })
   @ApiUuidParam('id', 'Project id.')
-  @ApiListResponse('Members with roles.')
+  @ApiResponse({ status: 200, description: 'Members with roles (plain array).', type: MemberResponseDto, isArray: true })
   @ApiErrorResponses(401, 403, 404, 429)
   @UseGuards(JwtAuthGuard, AdminGuard)
   async getProjectMembers(@Param('id') id: string) {

@@ -3,6 +3,7 @@ import { ApiOperation, ApiResponse, ApiTags, ApiConsumes, ApiBody, ApiQuery } fr
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiKeyOrJwtAuthGuard, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
 import { ApiZodBody, ApiErrorResponses } from '../../common/index.js';
+import { UserResponseDto } from '../../common/index.js';
 import { UsersService } from './users.service.js';
 import { StorageService } from '../../storage/storage.service.js';
 import { updateUserSchema } from '@cordlyx/shared';
@@ -18,7 +19,7 @@ export class UsersController {
 
   @Get('me')
   @ApiOperation({ summary: 'Get current user profile' })
-  @ApiResponse({ status: 200, description: 'The current user.' })
+  @ApiResponse({ status: 200, description: 'The current user.', type: UserResponseDto })
   @ApiErrorResponses(401, 429)
   async getProfile(@CurrentUser() user: AuthenticatedUser) {
     return this.usersService.getProfile(user.id);
@@ -27,7 +28,7 @@ export class UsersController {
   @Get('search')
   @ApiOperation({ summary: 'Search users by name or email (member picker)' })
   @ApiQuery({ name: 'q', required: true, description: 'Search text.', example: 'alice' })
-  @ApiResponse({ status: 200, description: 'Matching users.' })
+  @ApiResponse({ status: 200, description: 'Matching users: [{ id, name, email, avatarUrl }].' })
   @ApiErrorResponses(400, 401, 429)
   async search(@Query('q') q: string) {
     return this.usersService.search(q ?? '');
@@ -36,7 +37,7 @@ export class UsersController {
   @Patch('me')
   @ApiOperation({ summary: 'Update your profile (name, avatar)' })
   @ApiZodBody(updateUserSchema)
-  @ApiResponse({ status: 200, description: 'The updated user.' })
+  @ApiResponse({ status: 200, description: 'The updated user.', type: UserResponseDto })
   @ApiErrorResponses(400, 401, 429)
   async updateProfile(@CurrentUser() user: AuthenticatedUser, @Body() body: unknown) {
     const data = updateUserSchema.parse(body);
@@ -53,7 +54,7 @@ export class UsersController {
       required: ['avatar'],
     },
   })
-  @ApiResponse({ status: 201, description: 'The user with the new avatar URL.' })
+  @ApiResponse({ status: 201, description: 'The user with the new avatar URL.', type: UserResponseDto })
   @ApiErrorResponses(400, 401, 429)
   @UseInterceptors(FileInterceptor('avatar'))
   async uploadAvatar(

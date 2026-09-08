@@ -574,7 +574,7 @@ curl -X POST "$BASE/quick-create" -H "$AUTH" -H 'Content-Type: application/json'
   "typeId": "00000000-0000-0000-0000-000000000001",
   "projectSlug": "string",
   "statusId": "00000000-0000-0000-0000-000000000001",
-  "planId": "00000000-0000-0000-0000-000000000001",
+  "planId": null,
   "description": "string"
 }'
 ```
