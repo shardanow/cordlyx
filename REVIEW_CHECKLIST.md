@@ -30,6 +30,8 @@ CI enforces lint/test/build; this list covers what CI cannot see.
 
 ## Docs
 - [ ] New endpoint appears in Swagger (correct tag) and in ARCHITECTURE.md §5.
+- [ ] New/changed endpoint documents summary + path/query params + body + responses via `common/swagger` helpers (`ApiZodBody`/`ApiZodQuery`/param factories/`ApiErrorResponses`) — no hand-written duplicates of Zod schemas.
+- [ ] `postman/` regenerated (`npm run docs:export`) when the API surface changes.
 - [ ] USER_GUIDE updated when user-visible behavior changes (including curl example where relevant).
 - [ ] No stale claims: grep the docs for the old behavior name and update every hit.
 

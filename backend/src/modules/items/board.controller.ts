@@ -1,7 +1,9 @@
 import { Controller, Get, Patch, Body, Param, UseGuards, UseInterceptors, Req } from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { EtagInterceptor } from '../../common/interceptors/etag.interceptor.js';
 import { Request } from 'express';
 import { ApiKeyOrJwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
+import { ApiZodBody, ApiProjectSlugParam, ApiUuidParam, ApiErrorResponses } from '../../common/index.js';
 import { getDb } from '../../database/client.js';
 import { items } from '../../database/schema/items.js';
 import { itemStatuses } from '../../database/schema/config.js';
@@ -11,6 +13,7 @@ import { moveItemSchema } from '@cordlyx/shared';
 import { ItemsService } from './items.service.js';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
+@ApiTags('Board')
 @Controller('projects/:projectSlug/board')
 @UseGuards(ApiKeyOrJwtAuthGuard, ProjectMembershipGuard)
 export class BoardController {
@@ -21,6 +24,10 @@ export class BoardController {
 
   @Get()
   @UseInterceptors(EtagInterceptor)
+  @ApiOperation({ summary: 'Get Kanban board (columns with items)' })
+  @ApiProjectSlugParam()
+  @ApiResponse({ status: 200, description: 'Board columns with their items.' })
+  @ApiErrorResponses(401, 403, 404, 429)
   async getBoard(@Req() req: Request) {
     const db = getDb();
     const projectId = req.projectId as string;
@@ -80,6 +87,12 @@ export class BoardController {
   }
 
   @Patch(':itemId')
+  @ApiOperation({ summary: 'Move an item (drag-and-drop: status + order)' })
+  @ApiProjectSlugParam()
+  @ApiUuidParam('itemId', 'Item id to move.')
+  @ApiZodBody(moveItemSchema)
+  @ApiResponse({ status: 200, description: 'The moved item.' })
+  @ApiErrorResponses(400, 401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
   async moveItem(

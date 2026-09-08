@@ -1,7 +1,9 @@
 import { Controller, Get, Post, Delete, Param, Body, UseGuards, Req } from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ApiKeyOrJwtAuthGuard, ProjectMembershipGuard, ProjectRoleGuard, MinimumRole, CurrentUser, type AuthenticatedUser } from '../../common/index.js';
+import { ApiZodBody, ApiProjectSlugParam, ApiUuidParam, ApiErrorResponses } from '../../common/index.js';
 import { assertItemInProject } from '../../common/assert-item.js';
 import { RelationsService } from './relations.service.js';
 import { createRelationSchema } from '@cordlyx/shared';
@@ -9,6 +11,7 @@ import { getDb } from '../../database/client.js';
 import { items } from '../../database/schema/items.js';
 import { eq } from 'drizzle-orm';
 
+@ApiTags('Relations')
 @Controller('projects/:projectSlug/items/:itemId/relations')
 @UseGuards(ApiKeyOrJwtAuthGuard, ProjectMembershipGuard)
 export class RelationsController {
@@ -18,12 +21,23 @@ export class RelationsController {
   ) {}
 
   @Get()
+  @ApiOperation({ summary: 'List relations of an item' })
+  @ApiProjectSlugParam()
+  @ApiUuidParam('itemId', 'Item id.')
+  @ApiResponse({ status: 200, description: 'Relation list.' })
+  @ApiErrorResponses(401, 403, 404, 429)
   async list(@Req() req: Request, @Param('itemId') itemId: string) {
     await assertItemInProject(req.projectId as string, itemId);
     return this.relationsService.getByItem(itemId);
   }
 
   @Post()
+  @ApiOperation({ summary: 'Relate an item to another item in the same project' })
+  @ApiProjectSlugParam()
+  @ApiUuidParam('itemId', 'Source item id.')
+  @ApiZodBody(createRelationSchema)
+  @ApiResponse({ status: 201, description: 'The created relation.' })
+  @ApiErrorResponses(400, 401, 403, 404, 409, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
   async create(
@@ -53,6 +67,12 @@ export class RelationsController {
   }
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete a relation' })
+  @ApiProjectSlugParam()
+  @ApiUuidParam('itemId', 'Item id.')
+  @ApiUuidParam('id', 'Relation id.')
+  @ApiResponse({ status: 200, description: 'Deletion result.' })
+  @ApiErrorResponses(401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('member')
   async delete(
