@@ -10,11 +10,12 @@ test.describe('Project flow', () => {
     await page.getByRole('button', { name: 'Sign In' }).click();
     await expect(page).toHaveURL('/projects', { timeout: 10000 });
 
-    // Create a new project
+    // Create a new project (unique name: retries must not clash with attempt 1)
+    const projectName = `E2E Test Project ${Date.now()}`;
     await page.getByRole('button', { name: /create project/i }).first().click();
-    await page.getByPlaceholder('Project name').fill('E2E Test Project');
+    await page.getByPlaceholder('Project name').fill(projectName);
     await page.locator('form').getByRole('button', { name: 'Create project' }).click();
-    await expect(page.getByText('E2E Test Project')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { name: projectName, exact: true })).toBeVisible({ timeout: 5000 });
 
     // Navigate to board
     await page.getByRole('link', { name: /board/i }).click();
@@ -32,9 +33,9 @@ test.describe('Project flow', () => {
     await page.getByRole('button', { name: 'Sign In' }).click();
     await expect(page).toHaveURL('/projects', { timeout: 10000 });
 
-    // Create project for test
+    // Create project for test (unique name: retries must not clash with attempt 1)
     await page.getByRole('button', { name: /create project/i }).first().click();
-    await page.getByPlaceholder('Project name').fill('Settings Test');
+    await page.getByPlaceholder('Project name').fill(`Settings Test ${Date.now()}`);
     await page.locator('form').getByRole('button', { name: 'Create project' }).click();
     await page.waitForTimeout(1000);
 
@@ -45,8 +46,8 @@ test.describe('Project flow', () => {
     await expect(page.getByText('Item Statuses')).toBeVisible();
     await expect(page.getByText('Item Priorities')).toBeVisible();
     // Default types should be pre-seeded
-    await expect(page.getByText('Task')).toBeVisible();
-    await expect(page.getByText('Bug')).toBeVisible();
+    await expect(page.getByText('Task', { exact: true })).toBeVisible();
+    await expect(page.getByText('Bug', { exact: true })).toBeVisible();
   });
 
   test('should show activity page with empty state', async ({ page }) => {
@@ -85,9 +86,11 @@ test.describe('Project flow', () => {
     // Go to Members tab
     await page.getByRole('link', { name: /members/i }).click();
     await expect(page).toHaveURL(/\/members$/);
-    // Alice should be listed as admin (sidebar also shows her email — take the first)
-    await expect(page.getByText('alice@example.com').first()).toBeVisible({ timeout: 5000 });
+    // Alice should be listed as admin (scoped to main: the sidebar duplicates
+    // her email, including a hidden mobile copy)
+    const main = page.locator('main');
+    await expect(main.getByText('alice@example.com')).toBeVisible({ timeout: 5000 });
     // Admin role badge or text should be visible
-    await expect(page.getByText(/admin/i).first()).toBeVisible();
+    await expect(main.getByText(/admin/i).first()).toBeVisible();
   });
 });

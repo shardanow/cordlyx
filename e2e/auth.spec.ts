@@ -9,7 +9,7 @@ test.describe('Auth', () => {
     await page.getByRole('button', { name: 'Sign In' }).click();
 
     await expect(page).toHaveURL('/projects', { timeout: 10000 });
-    await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Projects', exact: true })).toBeVisible();
   });
 
   test('should show error on invalid credentials', async ({ page }) => {

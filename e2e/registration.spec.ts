@@ -12,7 +12,7 @@ test.describe('Registration', () => {
     await page.getByRole('button', { name: 'Register', exact: true }).click();
 
     await expect(page).toHaveURL('/projects', { timeout: 10000 });
-    await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Projects', exact: true })).toBeVisible();
   });
 
   test('should reject duplicate email registration', async ({ page }) => {

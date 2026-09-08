@@ -10,13 +10,15 @@ test.describe('Profile', () => {
     await page.getByRole('button', { name: 'Sign In' }).click();
     await expect(page).toHaveURL('/projects', { timeout: 10000 });
 
-    // Navigate to Profile (sidebar user block links to /profile)
-    await page.locator('a[href="/profile"]').first().click();
+    // Navigate to Profile directly (sidebar is rendered twice for
+    // mobile/desktop — a plain locator would hit the hidden copy)
+    await page.goto('/profile');
     await expect(page).toHaveURL('/profile');
     // Name input should be visible with current value
     await expect(page.getByPlaceholder('Your name')).toBeVisible({ timeout: 3000 });
-    // Email should be visible (sidebar also shows it — take the first)
-    await expect(page.getByText('alice@example.com').first()).toBeVisible();
+    // Email should be visible (scoped to main: the sidebar duplicates it,
+    // including a hidden mobile copy)
+    await expect(page.locator('main').getByText('alice@example.com')).toBeVisible();
   });
 
   test('should update display name', async ({ page }) => {
@@ -27,13 +29,14 @@ test.describe('Profile', () => {
     await expect(page).toHaveURL('/projects', { timeout: 10000 });
 
     // Go to profile
-    await page.locator('a[href="/profile"]').first().click();
+    await page.goto('/profile');
     await expect(page).toHaveURL('/profile');
 
     const newName = `Alice E2E ${Date.now()}`;
     await page.getByPlaceholder('Your name').fill(newName);
-    // Click save button
-    await page.getByRole('button', { name: /save/i }).first().click();
+    // Click save button (scoped to the profile form — the page has more Save buttons)
+    const profileForm = page.locator('form', { has: page.getByPlaceholder('Your name') });
+    await profileForm.getByRole('button', { name: 'Save' }).click();
     // Verify success feedback
     await expect(page.getByText('Profile updated.')).toBeVisible({ timeout: 5000 });
 
@@ -44,6 +47,6 @@ test.describe('Profile', () => {
 
     // Restore original name
     await page.getByPlaceholder('Your name').fill('Alice');
-    await page.getByRole('button', { name: /save/i }).click();
+    await profileForm.getByRole('button', { name: 'Save' }).click();
   });
 });
