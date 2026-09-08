@@ -545,7 +545,7 @@ When you run `./dev.sh reset`, the following demo data is created:
 
 Interactive OpenAPI documentation (Swagger UI) is served by the backend:
 
-- UI: `http://localhost:4000/api/docs`
+- UI: `http://localhost:4000/api/docs` (dev) or `https://your-domain/api/docs` (prod, via nginx)
 - Raw OpenAPI JSON: `http://localhost:4000/api/docs-json`
 
 A full endpoint reference also lives in `ARCHITECTURE.md` (section 5). Item payloads follow the Zod schemas in `packages/shared/src/schemas/index.ts` (`createItemSchema`, `updateItemSchema`).
@@ -564,7 +564,7 @@ Scoped keys (`projectId` set via API) only work inside that project; admin and k
 
 Manage keys: `GET /api-keys` (list with last-used + budget), `POST /api-keys` (`{ name, projectId?, expiresAt?, rateLimitPerMin? }`), `PATCH /api-keys/:id` (rename / change budget 1–10000), `DELETE /api-keys/:id` (revokes immediately).
 
-Ready-made clients: every CI run publishes a Postman collection + curl cookbook (Actions → latest run → Artifacts → `api-clients`), generated from the live OpenAPI so they never rot. Or generate locally: `curl -sf localhost:4000/api/docs-json -o openapi.json && node scripts/openapi-to-postman.mjs openapi.json postman/`.
+Ready-made clients: the repo tracks `postman/CordLyx.postman_collection.json` + `postman/CURL.md` (import into Postman/Insomnia or copy curl). They are generated from the live OpenAPI — refresh with `npm run docs:export` (needs the backend running) after API changes. Every CI run also publishes a fresh copy (Actions → latest run → Artifacts → `api-clients`).
 
 **Offline sync & caching:** heavy GETs (items list, board, exports) send a weak `ETag` — repeat with `If-None-Match` for an empty `304`. `GET /api/v1/projects/:slug/sync?since=<ISO>` returns touched items (deleted as `{ id, deleted: true }` stubs) with `meta { serverTime, hasMore, fullSyncRequired }`; when truncated, fall back to a full list.
 
