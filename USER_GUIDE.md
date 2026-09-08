@@ -485,7 +485,7 @@ Other headers: `X-Cordlyx-Event` (event name), `X-Cordlyx-Delivery` (delivery id
 
 ### API key rate limits
 
-Each key has a requests/min budget (default 120, editable in **Profile → API Keys**). Exceeding it returns `429`. JWT/IP traffic keeps the shared 60/min budget. Keys also show last-used date.
+Each key has a requests/min budget (default 120, editable in **Profile → API Keys**). Exceeding it returns `429`. JWT/IP traffic keeps the shared 120/min budget. Keys also show last-used date.
 
 ---
 
