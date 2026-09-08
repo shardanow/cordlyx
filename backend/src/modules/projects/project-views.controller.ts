@@ -73,6 +73,10 @@ export class ProjectViewsController {
 
   @Post(':id/set-default')
   @ApiOperation({ summary: 'Make a view the project default (admin)' })
+  @ApiProjectSlugParam()
+  @ApiUuidParam('id', 'View id.')
+  @ApiResponse({ status: 201, description: 'The default view.' })
+  @ApiErrorResponses(401, 403, 404, 429)
   @UseGuards(ProjectRoleGuard)
   @MinimumRole('admin')
   async setDefault(@Param('id') id: string, @Req() req: Request) {

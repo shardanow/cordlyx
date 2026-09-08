@@ -48,6 +48,8 @@ async function bootstrap() {
 
   // OpenAPI docs (Swagger UI at /api/docs, raw JSON at /api/docs-json).
   // Served directly on the HTTP adapter, so the global api/v1 prefix does not apply.
+  // Request schemas come from the shared Zod schemas (single source of truth)
+  // via backend/src/common/swagger helpers — never hand-duplicated.
   const swaggerConfig = new DocumentBuilder()
     .setTitle('CordLyx API')
     .setDescription(
