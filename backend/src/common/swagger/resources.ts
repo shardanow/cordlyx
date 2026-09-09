@@ -263,7 +263,7 @@ export class PlanResponseDto {
   @ApiProperty({ nullable: true, example: null })
   description!: string | null;
 
-  @ApiProperty({ enum: ['release', 'milestone', 'campaign', 'goal', 'custom'], example: 'release' })
+  @ApiProperty({ enum: ['release', 'milestone', 'campaign', 'goal', 'sprint', 'custom'], example: 'release' })
   type!: string;
 
   @ApiProperty({ enum: ['active', 'completed', 'cancelled'], example: 'active' })
@@ -271,6 +271,12 @@ export class PlanResponseDto {
 
   @ApiProperty({ nullable: true, example: '#3B82F6' })
   color!: string | null;
+
+  @ApiProperty({ nullable: true, example: '2026-09-01', description: 'Optional start date YYYY-MM-DD.' })
+  startDate!: string | null;
+
+  @ApiProperty({ nullable: true, example: '2026-09-14', description: 'Optional end date YYYY-MM-DD.' })
+  endDate!: string | null;
 
   @ApiProperty({ example: TS })
   createdAt!: string;

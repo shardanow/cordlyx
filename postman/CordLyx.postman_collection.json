@@ -1044,7 +1044,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"string\",\n  \"filters\": {\n    \"typeId\": null,\n    \"statusId\": null,\n    \"priorityId\": null,\n    \"assigneeId\": null,\n    \"planId\": null,\n    \"search\": \"string\"\n  },\n  \"isShared\": true\n}",
+              "raw": "{\n  \"name\": \"string\",\n  \"filters\": {\n    \"typeId\": null,\n    \"statusId\": null,\n    \"priorityId\": null,\n    \"assigneeId\": null,\n    \"planId\": null,\n    \"search\": \"string\",\n    \"tagIds\": [\n      \"00000000-0000-0000-0000-000000000001\"\n    ],\n    \"sort\": \"string\"\n  },\n  \"isShared\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1089,7 +1089,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"string\",\n  \"filters\": {\n    \"typeId\": null,\n    \"statusId\": null,\n    \"priorityId\": null,\n    \"assigneeId\": null,\n    \"planId\": null,\n    \"search\": \"string\"\n  },\n  \"isShared\": true\n}",
+              "raw": "{\n  \"name\": \"string\",\n  \"filters\": {\n    \"typeId\": null,\n    \"statusId\": null,\n    \"priorityId\": null,\n    \"assigneeId\": null,\n    \"planId\": null,\n    \"search\": \"string\",\n    \"tagIds\": [\n      \"00000000-0000-0000-0000-000000000001\"\n    ],\n    \"sort\": \"string\"\n  },\n  \"isShared\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1936,7 +1936,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/projects/:projectSlug/items?cursor=&limit=&typeId=&statusId=&priorityId=&assigneeId=&reporterId=&tagIds=&parentId=&planId=&search=&sort=",
+              "raw": "{{baseUrl}}/api/v1/projects/:projectSlug/items?cursor=&page=&limit=&typeId=&statusId=&priorityId=&assigneeId=&reporterId=&tagIds=&parentId=&planId=&search=&sort=",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -1950,6 +1950,12 @@
               "query": [
                 {
                   "key": "cursor",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
                   "value": "",
                   "description": "",
                   "disabled": true
@@ -2228,6 +2234,87 @@
               ]
             },
             "description": "Import items from a CSV, JSON or JSONL file (max 10 MB, 100 rows)"
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/projects/{projectSlug}/items/meta/children-counts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/projects/:projectSlug/items/meta/children-counts?ids=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "projects",
+                ":projectSlug",
+                "items",
+                "meta",
+                "children-counts"
+              ],
+              "query": [
+                {
+                  "key": "ids",
+                  "value": "",
+                  "description": "",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Children counts for given parent ids (?ids=a,b). Powers Tree expand chevrons."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/projects/{projectSlug}/items/{id}/children",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt}}",
+                "type": "text"
+              },
+              {
+                "key": "X-API-Key",
+                "value": "{{apiKey}}",
+                "type": "text",
+                "disabled": true
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/projects/:projectSlug/items/:id/children",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "projects",
+                ":projectSlug",
+                "items",
+                ":id",
+                "children"
+              ],
+              "query": []
+            },
+            "description": "List direct children of one item (for Tree view drill-down)"
           },
           "response": []
         },
@@ -2709,7 +2796,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"string\",\n  \"type\": \"release\",\n  \"description\": \"string\",\n  \"color\": \"string\",\n  \"status\": \"active\",\n  \"sortOrder\": 1\n}",
+              "raw": "{\n  \"name\": \"string\",\n  \"type\": \"release\",\n  \"description\": \"string\",\n  \"color\": \"string\",\n  \"status\": \"active\",\n  \"startDate\": null,\n  \"endDate\": null,\n  \"sortOrder\": 1\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2754,7 +2841,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"string\",\n  \"type\": \"release\",\n  \"description\": \"string\",\n  \"color\": \"string\",\n  \"status\": \"active\",\n  \"sortOrder\": 1\n}",
+              "raw": "{\n  \"name\": \"string\",\n  \"type\": \"release\",\n  \"description\": \"string\",\n  \"color\": \"string\",\n  \"status\": \"active\",\n  \"startDate\": null,\n  \"endDate\": null,\n  \"sortOrder\": 1\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -4407,7 +4494,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/projects/:projectSlug/activity?cursor=&limit=&actorId=&action=&itemId=&sort=&dateFrom=&dateTo=",
+              "raw": "{{baseUrl}}/api/v1/projects/:projectSlug/activity?cursor=&page=&limit=&actorId=&action=&itemId=&sort=&dateFrom=&dateTo=",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -4421,6 +4508,12 @@
               "query": [
                 {
                   "key": "cursor",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
                   "value": "",
                   "description": "",
                   "disabled": true
@@ -4491,7 +4584,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/projects/:projectSlug/items/:itemId/activity?itemId=&cursor=&limit=&actorId=&action=&sort=&dateFrom=&dateTo=",
+              "raw": "{{baseUrl}}/api/v1/projects/:projectSlug/items/:itemId/activity?itemId=&cursor=&page=&limit=&actorId=&action=&sort=&dateFrom=&dateTo=",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -4513,6 +4606,12 @@
                 },
                 {
                   "key": "cursor",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
                   "value": "",
                   "description": "",
                   "disabled": true
@@ -4582,7 +4681,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/search?cursor=&limit=&q=&projectId=",
+              "raw": "{{baseUrl}}/api/v1/search?cursor=&page=&limit=&q=&projectId=",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -4594,6 +4693,12 @@
               "query": [
                 {
                   "key": "cursor",
+                  "value": "",
+                  "description": "",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
                   "value": "",
                   "description": "",
                   "disabled": true

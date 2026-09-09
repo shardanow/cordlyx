@@ -75,4 +75,33 @@ describe('PlansTransferService', () => {
     expect(res.meta.created).toBe(0);
     expect(res.meta.skipped).toBeGreaterThan(0);
   });
+
+  it('CSV round-trips sprint dates without loss', async () => {
+    const created = await service.bulkCreate(projectId, [
+      { name: `Sprint Dated ${Date.now()}`, type: 'sprint', startDate: '2026-09-01', endDate: '2026-09-14' },
+    ]);
+    expect(created.meta).toMatchObject({ created: 1, failed: 0 });
+
+    const csv = (await service.exportAll(projectId, 'csv')) as string;
+    expect(csv).toContain('Start Date');
+    expect(csv).toContain('2026-09-01');
+
+    // Fresh project: import must recreate the sprint WITH its dates.
+    const db = getDb();
+    const otherUserId = randomUUID();
+    await db.insert(users).values({
+      id: otherUserId,
+      email: `plans-dates-${Date.now()}@test.com`,
+      passwordHash: await bcrypt.hash('password123', 12),
+      name: 'Plans Dates',
+    });
+    const { ProjectsService: PS } = await import('../projects/projects.service.js');
+    const fresh = await new PS().create({ name: `Plans Dates ${Date.now()}`, slug: `plans-dates-${Date.now()}` }, otherUserId);
+    const res = await service.importFile(fresh!.id, { originalname: 'plans.csv', buffer: Buffer.from(csv) });
+    expect(res.meta.failed).toBe(0);
+    const imported = (await service.exportAll(fresh!.id, 'json')) as { name: string; startDate: string | null; endDate: string | null }[];
+    const sprint = imported.find((p) => p.name.startsWith('Sprint Dated'));
+    expect(sprint?.startDate).toBe('2026-09-01');
+    expect(sprint?.endDate).toBe('2026-09-14');
+  });
 });
