@@ -10,7 +10,7 @@ import { tags as tagsTable, itemTags } from '../../database/schema/tags.js';
 import { issueSequences } from '../../database/schema/sequences.js';
 import { itemStatuses, itemPriorities, itemTypes } from '../../database/schema/config.js';
 import { users } from '../../database/schema/users.js';
-import { eq, and, sql, desc, gt, isNull, inArray } from 'drizzle-orm';
+import { eq, and, sql, desc, asc, gt, isNull, inArray, count } from 'drizzle-orm';
 
 @Injectable()
 export class ItemsService {
@@ -186,6 +186,7 @@ export class ItemsService {
       planId?: string;
       search?: string;
       cursor?: string;
+      page?: number;
       limit: number;
       sort: string;
     },
@@ -217,7 +218,9 @@ export class ItemsService {
       }
     }
 
-    if (filters.cursor) {
+    const usePageMode = filters.page !== undefined && filters.page !== null;
+    // Cursor mode keeps legacy behavior; page mode ignores cursor for jump support.
+    if (!usePageMode && filters.cursor) {
       const { date: cursorDate } = decodeCursorDate(filters.cursor);
       conditions.push(sql`${items.createdAt} < ${cursorDate}::timestamptz`);
     }
@@ -235,16 +238,45 @@ export class ItemsService {
       assignee: 'assigneeId',
     };
     const dbField = columnMap[camelField] ?? camelField;
-    const orderByColumn = (items as any)[dbField];
-    const orderDir = isDesc ? desc : (x: any) => x;
+    const orderByColumn = (items as any)[dbField] ?? items.createdAt;
+    const primaryOrder = isDesc ? desc(orderByColumn) : asc(orderByColumn);
+    // Stable tiebreaker so offset pagination doesn't skip/duplicate rows.
+    const orderBy = [primaryOrder, desc(items.id)];
 
     const limit = Math.min(filters.limit, 100);
+
+    // Filtered total for headers ("N items in project", "limit of total").
+    // Runs with the same conditions (minus cursor/page slicing).
+    const totalRows = await db
+      .select({ value: count() })
+      .from(items)
+      .where(and(...conditions));
+    const total = Number(totalRows[0]?.value ?? 0);
+
+    if (usePageMode) {
+      const page = Math.max(1, Math.floor(filters.page as number));
+      const offset = (page - 1) * limit;
+      const result = await db
+        .select()
+        .from(items)
+        .where(and(...conditions))
+        .orderBy(...orderBy)
+        .limit(limit)
+        .offset(offset);
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+      const hasMore = page < totalPages;
+      const lastItem = result[result.length - 1];
+      const cursor = lastItem
+        ? Buffer.from(`${lastItem.createdAt.toISOString()}|${lastItem.id}`).toString('base64')
+        : null;
+      return { data: result, meta: { cursor, hasMore, limit, total, page, totalPages } };
+    }
 
     const result = await db
       .select()
       .from(items)
       .where(and(...conditions))
-      .orderBy(orderDir(orderByColumn))
+      .orderBy(...orderBy)
       .limit(limit + 1);
 
     const hasMore = result.length > limit;
@@ -254,7 +286,60 @@ export class ItemsService {
       ? Buffer.from(`${lastItem.createdAt.toISOString()}|${lastItem.id}`).toString('base64')
       : null;
 
-    return { data, meta: { cursor, hasMore, limit } };
+    return { data, meta: { cursor, hasMore, limit, total } };
+  }
+
+  /** Direct children of one item (single level, for Tree UI drill-down). */
+  async listChildren(projectId: string, parentId: string) {
+    const db = getDb();
+    const result = await db
+      .select()
+      .from(items)
+      .where(and(eq(items.projectId, projectId), eq(items.parentId, parentId), isNull(items.deletedAt)))
+      .orderBy(desc(items.createdAt))
+      .limit(200);
+    return { data: result };
+  }
+
+  /** Number of non-deleted children per parent id (for expand chevrons). */
+  async childrenCounts(projectId: string, parentIds: string[]) {
+    const db = getDb();
+    if (!parentIds.length) return {} as Record<string, number>;
+    const rows = await db
+      .select({ parentId: items.parentId, value: count() })
+      .from(items)
+      .where(
+        and(
+          eq(items.projectId, projectId),
+          isNull(items.deletedAt),
+          inArray(items.parentId, parentIds),
+        ),
+      )
+      .groupBy(items.parentId);
+    const out: Record<string, number> = {};
+    for (const r of rows) {
+      if (r.parentId) out[r.parentId] = Number(r.value);
+    }
+    return out;
+  }
+
+  /** Walk ancestors to block cycles when reparenting (max depth guard). */
+  async assertNoCycle(projectId: string, itemId: string, newParentId: string | null) {
+    if (!newParentId) return;
+    if (newParentId === itemId) throw new BadRequestException('Item cannot be its own parent');
+    const db = getDb();
+    let current: string | null = newParentId;
+    for (let depth = 0; depth < 12; depth++) {
+      if (current === itemId) throw new BadRequestException('Circular parent reference');
+      const rows = await db
+        .select({ parentId: items.parentId })
+        .from(items)
+        .where(and(eq(items.id, current as string), eq(items.projectId, projectId)))
+        .limit(1);
+      current = (rows[0]?.parentId as string | null) ?? null;
+      if (!current) return;
+    }
+    throw new BadRequestException('Parent hierarchy too deep (max 10)');
   }
 
   async update(
@@ -293,6 +378,17 @@ export class ItemsService {
       .limit(1);
     if (!oldRow) {
       throw new NotFoundException('Item not found');
+    }
+    if (data.parentId !== undefined) {
+      await this.assertNoCycle(projectId, itemId, data.parentId);
+      if (data.parentId) {
+        const parent = await db
+          .select({ id: items.id })
+          .from(items)
+          .where(and(eq(items.id, data.parentId), eq(items.projectId, projectId), isNull(items.deletedAt)))
+          .limit(1);
+        if (!parent[0]) throw new BadRequestException('Parent item not found in this project');
+      }
     }
     const oldValues = {
       assigneeId: oldRow?.assigneeId ?? null,

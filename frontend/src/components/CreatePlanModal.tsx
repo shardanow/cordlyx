@@ -15,6 +15,8 @@ interface Plan {
   description: string | null;
   color: string | null;
   status: string;
+  startDate?: string | null;
+  endDate?: string | null;
 }
 
 const PLAN_TYPES = [
@@ -22,6 +24,7 @@ const PLAN_TYPES = [
   { value: 'milestone', label: 'Milestone' },
   { value: 'campaign', label: 'Campaign' },
   { value: 'goal', label: 'Goal' },
+  { value: 'sprint', label: 'Sprint' },
   { value: 'custom', label: 'Custom' },
 ] as const;
 
@@ -36,6 +39,7 @@ const TYPE_COLORS: Record<string, string> = {
   milestone: '#8B5CF6',
   campaign: '#F59E0B',
   goal: '#10B981',
+  sprint: '#06B6D4',
   custom: '#6B7280',
 };
 
@@ -61,6 +65,8 @@ export default function CreatePlanModal({
   const [type, setType] = useState('release');
   const [status, setStatus] = useState('active');
   const [description, setDescription] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -72,12 +78,16 @@ export default function CreatePlanModal({
       setType(plan.type);
       setStatus(plan.status);
       setDescription(plan.description ?? '');
+      setStartDate(plan.startDate ?? '');
+      setEndDate(plan.endDate ?? '');
       setError('');
     } else if (!open) {
       setName('');
       setType(PLAN_TYPES[0].value);
       setStatus('active');
       setDescription('');
+      setStartDate('');
+      setEndDate('');
       setError('');
     }
   }, [open, plan]);
@@ -85,18 +95,25 @@ export default function CreatePlanModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
+    if (startDate && endDate && startDate > endDate) {
+      setError('Start date must be before end date');
+      return;
+    }
 
     setSaving(true);
     setError('');
     try {
+      const payload = {
+        name: name.trim(),
+        type,
+        status,
+        description: description.trim() || undefined,
+        color: TYPE_COLORS[type],
+        startDate: startDate || null,
+        endDate: endDate || null,
+      };
       if (isEdit) {
-        const updated = await api.patch<Plan>(`/projects/${projectSlug}/plans/${plan!.id}`, {
-          name: name.trim(),
-          type,
-          status,
-          description: description.trim() || undefined,
-          color: TYPE_COLORS[type],
-        });
+        const updated = await api.patch<Plan>(`/projects/${projectSlug}/plans/${plan!.id}`, payload);
         queryClient.invalidateQueries({ queryKey: ['plans', projectSlug] });
         if (onCreated) onCreated(updated);
       } else {
@@ -105,6 +122,8 @@ export default function CreatePlanModal({
           type,
           description: description.trim() || undefined,
           color: TYPE_COLORS[type],
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
         });
         queryClient.invalidateQueries({ queryKey: ['plans', projectSlug] });
         if (onCreated) onCreated(created);
@@ -179,6 +198,28 @@ export default function CreatePlanModal({
               rows={3}
               className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">Start (optional)</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">End (optional)</label>
+              <input
+                type="date"
+                value={endDate}
+                min={startDate || undefined}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
+            </div>
           </div>
 
           {error && <div className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded-md border border-destructive/20">{error}</div>}

@@ -11,7 +11,9 @@ export const viewFiltersSchema = z.object({
   assigneeId: z.string().uuid().or(z.literal('')).optional(),
   planId: z.string().uuid().or(z.literal('')).optional(),
   search: z.string().max(500).optional(),
-});
+  tagIds: z.array(z.string().uuid()).max(50).optional(),
+  sort: z.string().max(30).optional(),
+}).passthrough();
 
 export const createViewSchema = z.object({
   name: z.string().min(1).max(100),

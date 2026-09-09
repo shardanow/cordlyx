@@ -184,6 +184,24 @@ export class ItemsController {
     return { data: stripInternal(data), meta };
   }
 
+  @Get('meta/children-counts')
+  @ApiOperation({ summary: 'Children counts for given parent ids (?ids=a,b). Powers Tree expand chevrons.' })
+  @ApiProjectSlugParam()
+  async childrenCounts(@Req() req: Request, @Query('ids') ids?: string) {
+    const list = (ids ?? '').split(',').map((s) => s.trim()).filter(Boolean).slice(0, 200);
+    const counts = await this.itemsService.childrenCounts(req.projectId as string, list);
+    return { data: counts };
+  }
+
+  @Get(':id/children')
+  @ApiOperation({ summary: 'List direct children of one item (for Tree view drill-down)' })
+  @ApiProjectSlugParam()
+  @ApiUuidParam('id', 'Parent item id.')
+  async listChildren(@Req() req: Request, @Param('id') id: string) {
+    await assertItemInProject(req.projectId as string, id);
+    return this.itemsService.listChildren(req.projectId as string, id);
+  }
+
   @Get(':sequenceNum')
   @ApiOperation({ summary: 'Get one item by its sequence number' })
   @ApiProjectSlugParam()

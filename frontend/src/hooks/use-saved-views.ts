@@ -15,6 +15,8 @@ export interface SavedView {
     assigneeId?: string;
     planId?: string;
     search?: string;
+    tagIds?: string[];
+    sort?: string;
   };
   isShared: boolean;
   isDefault: boolean;

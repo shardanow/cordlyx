@@ -1,13 +1,14 @@
 'use client';
 
 import type { RefObject } from 'react';
-import { Search, ListTodo, CircleDot, Flag, User, Target } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Search, ListTodo, CircleDot, Flag, User, Target, Tags } from 'lucide-react';
 import { Select, SelectTrigger, SelectContent, SelectOption } from '@/components/ui/select';
 import { AvatarCircle } from '@/components/features/AvatarCircle';
 import { TypeIcon } from '@/components/features/TypeIcon';
 import { StatusDot } from '@/components/features/StatusDot';
 import { cn } from '@/lib/utils';
-import type { ItemType, ItemStatus, ItemPriority, ProjectMember, Plan } from '@/lib/project-data';
+import type { ItemType, ItemStatus, ItemPriority, ProjectMember, Plan, TagInfo } from '@/lib/project-data';
 
 export interface FilterValues {
   search: string;
@@ -17,6 +18,7 @@ export interface FilterValues {
   priorityId: string;
   assigneeId: string;
   planId: string;
+  tagIds: string[];
 }
 
 interface FilterBarProps {
@@ -30,6 +32,7 @@ interface FilterBarProps {
     priorities: ItemPriority[];
     members: ProjectMember[];
     plans: Plan[];
+    tags?: TagInfo[];
   };
   showStatus?: boolean;
   showPlan?: boolean;
@@ -56,8 +59,24 @@ export function FilterBar({
   searchRef,
   trailing,
 }: FilterBarProps) {
-  const { types, statuses, priorities, members, plans } = data;
+  const { types, statuses, priorities, members, plans, tags = [] } = data;
   const selectedType = types.find((t) => t.id === values.typeId);
+  const [tagsOpen, setTagsOpen] = useState(false);
+  const tagsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!tagsOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (tagsRef.current && !tagsRef.current.contains(e.target as Node)) setTagsOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [tagsOpen]);
+
+  const toggleTag = (id: string) => {
+    const cur = values.tagIds ?? [];
+    onChange({ tagIds: cur.includes(id) ? cur.filter((t) => t !== id) : [...cur, id] });
+  };
 
   const searchBox = (
     <label
@@ -190,10 +209,82 @@ export function FilterBar({
               <SelectOption key={p.id} value={p.id}>
                 <StatusDot color={p.color ?? '#6B7280'} />
                 {p.name}
+                {p.type === 'sprint' ? ' · sprint' : ''}
+                {p.startDate || p.endDate ? ` (${p.startDate ?? '…'}→${p.endDate ?? '…'})` : ''}
               </SelectOption>
             ))}
           </SelectContent>
         </Select>
+      )}
+
+      <div ref={tagsRef} className="relative">
+        <button
+          type="button"
+          onClick={() => setTagsOpen((o) => !o)}
+          className={triggerClass((values.tagIds ?? []).length > 0, layout)}
+        >
+          <Tags className="w-4 h-4 shrink-0" />
+          <span className="truncate">
+            {(values.tagIds ?? []).length > 0 ? `Tags: ${(values.tagIds ?? []).length}` : 'Tags: All'}
+          </span>
+        </button>
+        {tagsOpen && (
+          <div className="absolute z-50 mt-1 min-w-[220px] max-w-[300px] max-h-[280px] overflow-auto bg-card border border-border rounded-lg shadow-lg p-1">
+            {(values.tagIds ?? []).length > 0 && (
+              <button
+                type="button"
+                onClick={() => onChange({ tagIds: [] })}
+                className="w-full text-left px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded"
+              >
+                Clear tags
+              </button>
+            )}
+            {tags.length === 0 && (
+              <div className="px-3 py-2 text-sm text-muted-foreground">No tags in project</div>
+            )}
+            {tags.map((t) => {
+              const checked = (values.tagIds ?? []).includes(t.id);
+              return (
+                <label
+                  key={t.id}
+                  className="flex items-center gap-2.5 px-3 py-2 text-sm rounded hover:bg-muted cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleTag(t.id)}
+                    className="accent-current"
+                  />
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: t.color ?? '#888' }}
+                  />
+                  <span className="truncate">{t.name}</span>
+                </label>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      {(values.tagIds ?? []).length > 0 && (
+        <div className="flex flex-wrap gap-1.5 col-span-full">
+          {(values.tagIds ?? []).map((id) => {
+            const t = tags.find((x) => x.id === id);
+            if (!t) return null;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => toggleTag(id)}
+                className="h-6 px-2.5 rounded-full text-xs font-semibold inline-flex items-center gap-1 border"
+                style={t.color ? { color: t.color, backgroundColor: `${t.color}1f`, borderColor: `${t.color}45` } : undefined}
+                title="Remove tag filter"
+              >
+                {t.name} ✕
+              </button>
+            );
+          })}
+        </div>
       )}
     </>
   );
@@ -210,7 +301,7 @@ export function FilterBar({
 
   return (
     <div className="bg-card border border-border rounded-[14px] mb-5 md:mb-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,300px)_repeat(5,minmax(0,180px))_auto] gap-2.5 p-4 md:p-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5 p-4 md:p-5">
         {searchBox}
         {selects}
         {trailing}

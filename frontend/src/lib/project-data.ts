@@ -42,6 +42,16 @@ export interface Plan {
   id: string;
   name: string;
   color: string | null;
+  type?: string;
+  status?: string;
+  startDate?: string | null;
+  endDate?: string | null;
+}
+
+export interface TagInfo {
+  id: string;
+  name: string;
+  color: string | null;
 }
 
 export interface ProjectData {
@@ -51,6 +61,7 @@ export interface ProjectData {
   priorities: ItemPriority[];
   members: ProjectMember[];
   plans: Plan[];
+  tags: TagInfo[];
   isLoading: boolean;
 }
 
@@ -96,6 +107,12 @@ export function useProjectData(slug: string | undefined): ProjectData {
     enabled: !!slug,
   });
 
+  const { data: tags, isLoading: tagsLoading } = useQuery<TagInfo[]>({
+    queryKey: ['tags', slug],
+    queryFn: () => api.get(`/projects/${slug}/tags`),
+    enabled: !!slug,
+  });
+
   return {
     project,
     types: types ?? [],
@@ -103,6 +120,7 @@ export function useProjectData(slug: string | undefined): ProjectData {
     priorities: priorities ?? [],
     members: members ?? [],
     plans: plans ?? [],
-    isLoading: typesLoading || statusesLoading || prioritiesLoading || membersLoading || plansLoading,
+    tags: tags ?? [],
+    isLoading: typesLoading || statusesLoading || prioritiesLoading || membersLoading || plansLoading || tagsLoading,
   };
 }

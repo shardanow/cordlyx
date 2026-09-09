@@ -14,6 +14,7 @@ import TableHeader from '@tiptap/extension-table-header';
 import Mention from '@tiptap/extension-mention';
 import { ResizableImage } from './ResizableImage';
 import { PromptModal } from './ui/confirm-modal';
+import { markdownToHtml } from '@/lib/markdown';
 import { useEffect, useCallback, useRef, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -75,6 +76,11 @@ export default function RichEditor({
     const EMOJIS = ['👍', '❤️', '😄', '🎉', '🚀', '👀', '👎', '😠', '🔥', '💯', '✅', '❌', '⭐', '💡', '📌', '🎯'];
 
     const imageAttachments = attachments.filter((a) => a.mimeType.startsWith('image/'));
+
+    // Lazy legacy-markdown support: markdown stored in DB renders as real
+    // headings/task-lists inside Tiptap. Converted in-memory only; the DB
+    // row is rewritten only when the user presses Save in the caller.
+    const normalizedContent = useMemo(() => markdownToHtml(content), [content]);
 
     const mentionConfig = useMemo(() => {
         const memberList = members ?? [];
@@ -170,7 +176,7 @@ export default function RichEditor({
                 suggestion: mentionConfig,
             }),
         ],
-        content,
+        content: normalizedContent,
         immediatelyRender: false,
         autofocus: autoFocus,
         onUpdate({ editor }) {
@@ -184,10 +190,10 @@ export default function RichEditor({
     });
 
     useEffect(() => {
-        if (editor && content !== editor.getHTML()) {
-            editor.commands.setContent(content);
+        if (editor && normalizedContent !== editor.getHTML()) {
+            editor.commands.setContent(normalizedContent);
         }
-    }, [content]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [normalizedContent]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         if (!editor || !onImageUpload) return;
@@ -343,9 +349,17 @@ export default function RichEditor({
 
                 <button
                     type="button"
+                    onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+                    className={`${BTN} ${editor.isActive('heading', { level: 1 }) ? BTN_ACTIVE : ''}`}
+                    title="Heading 1 (or type '# ')"
+                >
+                    H1
+                </button>
+                <button
+                    type="button"
                     onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
                     className={`${BTN} ${editor.isActive('heading', { level: 2 }) ? BTN_ACTIVE : ''}`}
-                    title="Heading 2"
+                    title="Heading 2 (or type '## ')"
                 >
                     H2
                 </button>
@@ -380,7 +394,7 @@ export default function RichEditor({
                     type="button"
                     onClick={() => editor.chain().focus().toggleTaskList().run()}
                     className={`${BTN} ${editor.isActive('taskList') ? BTN_ACTIVE : ''}`}
-                    title="Task list"
+                    title="Task list (or type '- [ ] ')"
                 >
                     ☐
                 </button>

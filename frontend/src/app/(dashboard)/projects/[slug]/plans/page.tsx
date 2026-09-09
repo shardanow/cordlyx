@@ -17,6 +17,8 @@ interface Plan {
   type: string;
   status: string;
   color: string | null;
+  startDate: string | null;
+  endDate: string | null;
   sortOrder: number;
   createdAt: string;
 }
@@ -26,6 +28,7 @@ const PLAN_LABELS: Record<string, string> = {
   milestone: 'Milestone',
   campaign: 'Campaign',
   goal: 'Goal',
+  sprint: 'Sprint',
   custom: 'Custom',
 };
 
@@ -134,6 +137,9 @@ export default function PlansPage() {
                 <div className="font-semibold text-sm truncate">{plan.name}</div>
                 <div className="text-xs text-muted-foreground mt-0.5">
                   {PLAN_LABELS[plan.type] ?? plan.type}
+                  {(plan.startDate || plan.endDate) && (
+                    <span> · {plan.startDate ?? '…'} → {plan.endDate ?? '…'}</span>
+                  )}
                 </div>
                 {plan.description && (
                   <div className="text-xs text-muted-foreground/70 mt-1 line-clamp-2">

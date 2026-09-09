@@ -27,7 +27,7 @@ export class PlansService {
     return result[0] ?? null;
   }
 
-  async create(projectId: string, data: { name: string; type: string; description?: string; color?: string; status?: string; sortOrder?: number }) {
+  async create(projectId: string, data: { name: string; type: string; description?: string; color?: string; status?: string; startDate?: string | null; endDate?: string | null; sortOrder?: number }) {
     const db = getDb();
     const plan = await db
       .insert(plans)
@@ -38,6 +38,8 @@ export class PlansService {
         description: data.description ?? null,
         color: data.color ?? null,
         status: data.status ?? 'active',
+        startDate: (data.startDate as any) ?? null,
+        endDate: (data.endDate as any) ?? null,
         sortOrder: data.sortOrder ?? 0,
       })
       .returning();
@@ -46,7 +48,7 @@ export class PlansService {
     return plan[0];
   }
 
-  async update(projectId: string, planId: string, data: { name?: string; type?: string; description?: string; color?: string; status?: string; sortOrder?: number }) {
+  async update(projectId: string, planId: string, data: { name?: string; type?: string; description?: string; color?: string; status?: string; startDate?: string | null; endDate?: string | null; sortOrder?: number }) {
     const db = getDb();
     const existing = await this.getById(projectId, planId);
     if (!existing) throw new NotFoundException('Plan not found');

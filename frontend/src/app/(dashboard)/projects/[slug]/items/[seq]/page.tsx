@@ -15,7 +15,7 @@ import Spinner from '@/components/Spinner';
 import {
   ChevronLeft, Trash2, X, Upload, Edit3, MoreHorizontal,
   CircleDot, Flag, User, UserPlus, Calendar, Clock,
-  Pencil, Tags, Link2, Paperclip, MessageSquare,
+  Pencil, Tags, Link2, Paperclip, MessageSquare, ListTree,
 } from 'lucide-react';
 import { Target, Copy, ChevronUp } from 'lucide-react';
 import { Select, SelectTrigger, SelectContent, SelectOption } from '@/components/ui/select';
@@ -24,6 +24,8 @@ import { Avatar } from '@/components/ui/avatar';
 import { TypeIcon } from '@/components/features/TypeIcon';
 import { StatusDot } from '@/components/features/StatusDot';
 import { AssigneePicker } from '@/components/features/AssigneePicker';
+import { TagChip, RelationChip } from '@/components/features/Chips';
+import { renderBody } from '@/lib/markdown';
 import { useProjectData } from '@/lib/project-data';
 
 interface Tag {
@@ -112,25 +114,6 @@ function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function renderMarkdown(text: string): string {
-  return text
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/^### (.+)$/gm, '<h3 class="font-semibold text-base mt-3 mb-1">$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2 class="font-semibold text-lg mt-4 mb-1">$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1 class="font-bold text-xl mt-4 mb-2">$1</h1>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/`([^`]+)`/g, '<code class="bg-muted px-1 rounded text-xs font-mono">$1</code>')
-    .replace(/~~(.+?)~~/g, '<del>$1</del>')
-    .replace(/^&gt; (.+)$/gm, '<blockquote class="border-l-4 border-muted pl-3 text-muted-foreground italic">$1</blockquote>')
-    .replace(/^[-*] (.+)$/gm, '<li class="ml-4 list-disc">$1</li>')
-    .replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" class="text-primary underline" target="_blank" rel="noopener noreferrer">$1</a>')
-    .replace(/\n\n/g, '</p><p class="mb-2 mt-1">')
-    .replace(/\n/g, '<br>')
-    .replace(/^/, '<p class="mb-2">')
-    .replace(/$/, '</p>');
 }
 
 export default function ItemDetailPage() {
@@ -225,7 +208,27 @@ export default function ItemDetailPage() {
   const { data: allItems } = useQuery<{ data: { id: string; sequenceNum: number; title: string }[] }>({
     queryKey: ['allItems', slug],
     queryFn: () => api.get(`/projects/${slug}/items?limit=200`),
-    enabled: relationMenu,
+    enabled: relationMenu || !!item?.parentId,
+  });
+
+  const { data: parentInfo } = useQuery<{ id: string; sequenceNum: number; title: string } | null>({
+    queryKey: ['item-parent', slug, item?.parentId],
+    queryFn: async () => {
+      if (!item?.parentId) return null;
+      const found = (allItems?.data ?? []).find((i) => i.id === item.parentId);
+      if (found) return found;
+      const list = await api.get<{ data: { id: string; sequenceNum: number; title: string }[] }>(
+        `/projects/${slug}/items?limit=200`,
+      );
+      return (list.data ?? []).find((i) => i.id === item!.parentId) ?? null;
+    },
+    enabled: !!item?.parentId,
+  });
+
+  const { data: childrenData } = useQuery<{ data: { id: string; sequenceNum: number; title: string; statusId: string }[] }>({
+    queryKey: ['item-children', slug, item?.id],
+    queryFn: () => api.get(`/projects/${slug}/items/${item!.id}/children`),
+    enabled: !!item?.id,
   });
 
   const handleAddComment = async (e: React.FormEvent) => {
@@ -634,8 +637,34 @@ export default function ItemDetailPage() {
                 {(plans ?? []).map((p) => (
                   <SelectOption key={p.id} value={p.id}>
                     <StatusDot color={p.color ?? '#6B7280'} />
-                    {p.name}
+                    {p.name}{p.type === 'sprint' ? ' · sprint' : ''}{p.startDate || p.endDate ? ` (${p.startDate ?? '…'}→${p.endDate ?? '…'})` : ''}
                   </SelectOption>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="w-px h-5 bg-border shrink-0 hidden sm:block" />
+
+          {/* Parent (hierarchy: Design > Systems > item) */}
+          <div className="flex items-center gap-2 shrink-0">
+            <ListTree className="w-4 h-4 text-muted-foreground" />
+            <span className="text-xs md:text-sm font-semibold text-muted-foreground">Parent</span>
+            <Select
+              value={item.parentId ?? ''}
+              onChange={(v) => handleFieldUpdate('parentId', v || null)}
+            >
+              <SelectTrigger>
+                {item.parentId ? (
+                  <span>#{parentInfo?.sequenceNum ?? '…'} {parentInfo?.title ?? ''}</span>
+                ) : (
+                  <span className="text-muted-foreground">No parent</span>
+                )}
+              </SelectTrigger>
+              <SelectContent>
+                <SelectOption value="">No parent (top level)</SelectOption>
+                {(allItems?.data ?? []).filter((i) => i.id !== item.id).slice(0, 200).map((i) => (
+                  <SelectOption key={i.id} value={i.id}>#{i.sequenceNum} {i.title}</SelectOption>
                 ))}
               </SelectContent>
             </Select>
@@ -785,9 +814,7 @@ export default function ItemDetailPage() {
                 setDescriptionDraft(item.description ?? ''); setEditingDescription(true); setDescriptionPreview(false);
               }}
               dangerouslySetInnerHTML={{
-                __html: item.description.startsWith('<')
-                  ? item.description
-                  : renderMarkdown(item.description),
+                __html: renderBody(item.description),
               }}
               title="Click to edit"
             />
@@ -812,19 +839,7 @@ export default function ItemDetailPage() {
           </div>
           <div className="flex items-center flex-wrap gap-2">
             {itemTags.map((tag) => (
-              <span
-                key={tag.id}
-                className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-border bg-muted/50 text-sm text-foreground"
-                style={tag.color ? { borderColor: `${tag.color}3d`, color: tag.color } : undefined}
-              >
-                {tag.name}
-                <button
-                  onClick={() => handleTagToggle(tag)}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </span>
+              <TagChip key={tag.id} tag={tag} onRemove={() => handleTagToggle(tag)} />
             ))}
             {itemTags.length === 0 && !tagCreateOpen && (
               <span className="text-sm text-muted-foreground">No tags</span>
@@ -894,25 +909,16 @@ export default function ItemDetailPage() {
           <div className="flex items-center flex-wrap gap-2">
             {relations.map((rel) => {
               const related = rel.relatedItem;
+              if (!related) return null;
               return (
-                <span
+                <RelationChip
                   key={rel.id}
-                  className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-border bg-muted/50 text-sm text-foreground"
-                >
-                  <span className="text-muted-foreground text-xs">{RELATION_LABELS[rel.relationType] ?? rel.relationType}</span>
-                  <Link
-                    href={`/projects/${slug}/items/${related?.sequenceNum}`}
-                    className="font-medium hover:underline"
-                  >
-                    #{related?.sequenceNum} {related?.title}
-                  </Link>
-                  <button
-                    onClick={() => handleDeleteRelation(rel.id)}
-                    className="text-muted-foreground hover:text-destructive transition-colors"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </span>
+                  type={(rel.relationType as 'blocks' | 'depends_on' | 'relates_to' | 'duplicates' | 'child_of' | 'next_action') ?? 'relates_to'}
+                  seq={related.sequenceNum}
+                  title={related.title}
+                  href={`/projects/${slug}/items/${related.sequenceNum}`}
+                  onRemove={() => handleDeleteRelation(rel.id)}
+                />
               );
             })}
             {relations.length === 0 && !relationMenu && (
@@ -962,6 +968,36 @@ export default function ItemDetailPage() {
             >
               + Add relation
             </button>
+          )}
+        </div>
+      </div>
+
+      {/* Subtasks (hierarchy children via parentId) */}
+      <div className={`${cardClasses} mb-3`}>
+        <div className="flex flex-col gap-2 px-4 md:px-5 py-2.5 md:py-3">
+          <div className="flex items-center gap-2.5">
+            <ListTree className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-bold text-foreground">
+              Subtasks {(childrenData?.data ?? []).length > 0 ? `(${(childrenData?.data ?? []).length})` : ''}
+            </span>
+          </div>
+          {(childrenData?.data ?? []).length > 0 ? (
+            <div className="space-y-1.5">
+              {(childrenData?.data ?? []).map((c) => (
+                <Link
+                  key={c.id}
+                  href={`/projects/${slug}/items/${c.sequenceNum}`}
+                  className="flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg border border-border hover:bg-muted/40 transition"
+                >
+                  <span className="font-bold text-muted-foreground">#{c.sequenceNum}</span>
+                  <span className="truncate font-medium">{c.title}</span>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <span className="text-sm text-muted-foreground">
+              No subtasks — set this item as Parent from another item to build Design › Systems › concrete chains.
+            </span>
           )}
         </div>
       </div>
@@ -1136,7 +1172,7 @@ export default function ItemDetailPage() {
                       <div
                         className="prose prose-sm max-w-none text-sm text-foreground/90"
                         dangerouslySetInnerHTML={{
-                          __html: c.body.startsWith('<') ? c.body : c.body.replace(/\n/g, '<br>'),
+                          __html: renderBody(c.body),
                         }}
                       />
                     )}

@@ -136,6 +136,25 @@ select {
   flex: 1 1 auto;
 }
 
+/* Legacy markdown task lists rendered by markdown-it (read-only preview). */
+.prose li.md-task {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: -1.25rem;
+}
+
+.prose li.md-task input[type="checkbox"] {
+  margin: 0;
+  cursor: default;
+}
+
+.prose li.md-task-checked {
+  color: hsl(var(--muted-foreground));
+  text-decoration: line-through;
+}
+
 .prose table {
   border-collapse: collapse;
   width: 100%;

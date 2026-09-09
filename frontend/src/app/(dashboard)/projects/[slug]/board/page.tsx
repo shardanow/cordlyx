@@ -16,6 +16,8 @@ import { TypeIcon } from '@/components/features/TypeIcon';
 import { TypeBadge } from '@/components/features/TypeBadge';
 import { StatusDot } from '@/components/features/StatusDot';
 import { FilterBar } from '@/components/features/FilterBar';
+import { TagChip } from '@/components/features/Chips';
+import { bodyExcerpt } from '@/lib/markdown';
 import { useProjectData } from '@/lib/project-data';
 import type { ItemType, ItemPriority, ProjectMember, Plan } from '@/lib/project-data';
 import {
@@ -89,20 +91,14 @@ function SortableItem({
         <div className="text-md font-[900] tracking-tight mb-3">{item.title}</div>
         {item.description && (
           <div className="text-sm text-muted-foreground line-clamp-2 mb-3 leading-snug">
-            {item.description.replace(/<[^>]+>/g, '').substring(0, 120)}
+            {bodyExcerpt(item.description, 120)}
           </div>
         )}
 
         {(item.tags ?? []).length > 0 && (
           <div className="flex gap-1.5 flex-wrap pb-0">
             {(item.tags ?? []).map((tag) => (
-              <span
-                key={tag.id}
-                className="h-6 px-2.5 rounded-full bg-muted/20 text-muted-foreground text-xs font-bold inline-flex items-center"
-                style={tag.color ? { color: tag.color, backgroundColor: `${tag.color}18` } : undefined}
-              >
-                {tag.name}
-              </span>
+              <TagChip key={tag.id} tag={tag} small />
             ))}
           </div>
         )}
@@ -176,6 +172,7 @@ export default function BoardPage() {
   const [filterPriority, setFilterPriority] = useState('');
   const [filterAssignee, setFilterAssignee] = useState('');
   const [filterPlan, setFilterPlan] = useState('');
+  const [filterTags, setFilterTags] = useState<string[]>([]);
 
   const storageKey = `board:hidden:${slug}`;
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(() => {
@@ -203,9 +200,9 @@ export default function BoardPage() {
     queryFn: () => api.get(`/projects/${slug}/board`),
   });
 
-  const { project, types, priorities, members, plans } = useProjectData(slug);
+  const { project, types, priorities, members, plans, tags } = useProjectData(slug);
 
-  const hasFilters = debouncedSearch || filterType || filterPriority || filterAssignee || filterPlan;
+  const hasFilters = Boolean(debouncedSearch || filterType || filterPriority || filterAssignee || filterPlan || filterTags.length);
 
   const filteredColumns = useMemo(() => {
     if (!columns) return [];
@@ -215,7 +212,8 @@ export default function BoardPage() {
         if (filterType && item.typeId !== filterType) return false;
         if (filterPriority && item.priorityId !== filterPriority) return false;
         if (filterAssignee && item.assigneeId !== filterAssignee) return false;
-        if (filterPlan && item.planId !== filterPlan) return false;
+        if (filterPlan && (item as { planId?: string | null }).planId !== filterPlan) return false;
+        if (filterTags.length && !filterTags.every((t) => (item.tags ?? []).some((x) => x.id === t))) return false;
         if (debouncedSearch) {
           const q = debouncedSearch.toLowerCase();
           const titleMatch = item.title.toLowerCase().includes(q);
@@ -225,7 +223,7 @@ export default function BoardPage() {
         return true;
       }),
     }));
-  }, [columns, filterType, filterPriority, filterAssignee, filterPlan, debouncedSearch]);
+  }, [columns, filterType, filterPriority, filterAssignee, filterPlan, filterTags, debouncedSearch]);
 
   const visibleColumns = useMemo(() =>
     filteredColumns.filter((col) => !hiddenColumns.has(col.id)),
@@ -247,6 +245,8 @@ export default function BoardPage() {
     setFilterType('');
     setFilterPriority('');
     setFilterAssignee('');
+    setFilterPlan('');
+    setFilterTags([]);
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -337,7 +337,7 @@ export default function BoardPage() {
       {/* Toolbar */}
       <div className="bg-card border border-border rounded-[14px] mb-5 md:mb-6">
         <FilterBar
-          values={{ search, debouncedSearch, typeId: filterType, statusId: '', priorityId: filterPriority, assigneeId: filterAssignee, planId: filterPlan }}
+          values={{ search, debouncedSearch, typeId: filterType, statusId: '', priorityId: filterPriority, assigneeId: filterAssignee, planId: filterPlan, tagIds: filterTags }}
           onSearch={setSearch}
           onClearSearch={() => { setSearch(''); setDebouncedSearch(''); }}
           onChange={(patch) => {
@@ -345,8 +345,9 @@ export default function BoardPage() {
             if (patch.priorityId !== undefined) setFilterPriority(patch.priorityId);
             if (patch.assigneeId !== undefined) setFilterAssignee(patch.assigneeId);
             if (patch.planId !== undefined) setFilterPlan(patch.planId);
+            if (patch.tagIds !== undefined) setFilterTags(patch.tagIds);
           }}
-          data={{ types, statuses: [], priorities, members, plans }}
+          data={{ types, statuses: [], priorities, members, plans, tags }}
           showStatus={false}
           layout="row"
           trailing={

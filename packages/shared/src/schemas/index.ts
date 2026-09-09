@@ -168,6 +168,12 @@ export const createRelationSchema = z.object({
 
 export const paginationSchema = z.object({
   cursor: z.string().optional().describe('Opaque cursor from the previous page meta.'),
+  page: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .optional()
+    .describe('1-based page number (offset mode). If set, cursor is ignored.'),
   limit: z.coerce
     .number()
     .int()
@@ -247,12 +253,17 @@ export const updateRoadmapLaneSchema = createRoadmapLaneSchema.partial();
 
 // --- Plan ---
 
+// Note: startDate <= endDate is enforced by the DB check constraint
+// (chk_plans_dates) and the frontend form; kept out of Zod refine so
+// updatePlanSchema can stay a plain .partial() object.
 export const createPlanSchema = z.object({
   name: z.string().min(1).max(200),
   type: z.enum(PLAN_TYPES),
   description: z.string().max(5000).optional(),
   color: z.string().max(7).optional(),
   status: z.enum(PLAN_STATUSES).optional(),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable().describe('Optional start date YYYY-MM-DD.'),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable().describe('Optional end date YYYY-MM-DD.'),
   sortOrder: z.number().int().optional(),
 });
 
