@@ -210,6 +210,36 @@ describe('ItemsService', () => {
       const result = await itemsService.list(projectId, { limit: 5, sort: '-created_at' });
       expect(result.meta.total).toBeGreaterThanOrEqual(result.data.length);
     });
+
+    it('should attach tags to listed items', async () => {
+      const db = getDb();
+      const [tag] = await db.insert(tags).values({ projectId, name: `t-${Date.now()}`, color: '#ff0000' }).returning();
+      const tagged = await itemsService.create(
+        projectId, { title: 'Tagged item', typeId: taskTypeId, tagIds: [tag.id] }, testUser.id,
+      );
+      const result = await itemsService.list(projectId, { limit: 50, sort: '-created_at' });
+      const row = result.data.find((i) => i.id === tagged!.id) as unknown as { tags: { id: string; name: string }[] };
+      expect(row.tags.map((t) => t.id)).toContain(tag.id);
+      const untaggedRow = result.data.find((i) => i.id !== tagged!.id) as unknown as { tags: unknown[] };
+      expect(untaggedRow.tags).toEqual([]);
+    });
+
+    it('should filter by tagIds and reject garbage', async () => {
+      const db = getDb();
+      const [tag] = await db.insert(tags).values({ projectId, name: `f-${Date.now()}` }).returning();
+      const tagged = await itemsService.create(
+        projectId, { title: 'Filtered item', typeId: taskTypeId, tagIds: [tag.id] }, testUser.id,
+      );
+      await itemsService.create(projectId, { title: 'Plain item', typeId: taskTypeId }, testUser.id);
+
+      const one = await itemsService.list(projectId, { limit: 50, sort: '-created_at', tagIds: tag.id });
+      expect(one.data.map((i) => i.id)).toContain(tagged!.id);
+      expect(one.meta.total).toBe(1);
+
+      await expect(
+        itemsService.list(projectId, { limit: 5, sort: '-created_at', tagIds: 'not-a-uuid' }),
+      ).rejects.toThrow('Invalid tag id');
+    });
   });
 
   describe('hierarchy (parentId tree)', () => {

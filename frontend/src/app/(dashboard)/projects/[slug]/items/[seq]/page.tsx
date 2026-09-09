@@ -208,7 +208,7 @@ export default function ItemDetailPage() {
   const { data: allItems } = useQuery<{ data: { id: string; sequenceNum: number; title: string }[] }>({
     queryKey: ['allItems', slug],
     queryFn: () => api.get(`/projects/${slug}/items?limit=200`),
-    enabled: relationMenu || !!item?.parentId,
+    enabled: !!item?.id,
   });
 
   const { data: parentInfo } = useQuery<{ id: string; sequenceNum: number; title: string } | null>({
@@ -996,7 +996,7 @@ export default function ItemDetailPage() {
             </div>
           ) : (
             <span className="text-sm text-muted-foreground">
-              No subtasks — set this item as Parent from another item to build Design › Systems › concrete chains.
+              No subtasks yet — pick a parent above to make this a child task, or set this item as parent from another task.
             </span>
           )}
         </div>
