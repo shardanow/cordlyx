@@ -188,10 +188,13 @@ CREATE TABLE plans (
   type character varying(20) NOT NULL,
   status character varying(20) DEFAULT 'active' NOT NULL,
   color character varying(7),
+  start_date date,
+  end_date date,
   sort_order integer DEFAULT 0 NOT NULL,
   created_at timestamp DEFAULT now() NOT NULL,
   updated_at timestamp DEFAULT now() NOT NULL,
-  CONSTRAINT plans_pkey PRIMARY KEY (id)
+  CONSTRAINT plans_pkey PRIMARY KEY (id),
+  CONSTRAINT chk_plans_dates CHECK (start_date IS NULL OR end_date IS NULL OR start_date <= end_date)
 );
 
 CREATE TABLE issue_sequences (
@@ -418,6 +421,7 @@ ALTER TABLE revoked_refresh_tokens ADD CONSTRAINT revoked_refresh_tokens_user_id
 
 CREATE INDEX idx_items_status_sort ON items USING btree (status_id, sort_order);
 CREATE INDEX idx_items_project_created ON items USING btree (project_id, created_at);
+CREATE INDEX idx_items_parent ON items USING btree (parent_id) WHERE deleted_at IS NULL;
 CREATE INDEX idx_comments_item ON comments USING btree (item_id);
 CREATE INDEX idx_comments_parent ON comments USING btree (parent_id);
 CREATE INDEX idx_attachments_item_created ON attachments USING btree (item_id, created_at);

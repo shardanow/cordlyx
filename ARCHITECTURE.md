@@ -556,8 +556,11 @@ Notes:
 
 `.github/workflows/deploy.yml` — runs after green CI on main/master
 (`workflow_run`) or manually (`workflow_dispatch` with `ref` for rollback):
-SSH to VPS → `git pull` → DB backup → **`scripts/migrate.sh` (stops deploy on failure)** →
-`compose up -d --build` → `pg_isready` → `curl --fail :3005/health`. Concurrency group `production`,
+SSH to VPS → `git pull` → DB backup (**hard gate**: no fresh dump = stop) →
+**`scripts/migrate.sh` (stops deploy on failure)** →
+`compose up -d --build` → `pg_isready` → `curl --fail :3005/health` →
+on health failure **auto-rollback** to the previous SHA + rebuild + re-check.
+Concurrency group `production`,
 Environment `production` (`SSH_HOST/SSH_USER/SSH_KEY`, optional
 `SSH_PORT`/`DEPLOY_PATH`). Branch flow: `feature/*` → `dev` → `main`.
 
@@ -565,13 +568,21 @@ Environment `production` (`SSH_HOST/SSH_USER/SSH_KEY`, optional
 
 `scripts/migrate.sh` — versioned SQL from `backend/drizzle/migrations/`
 (`schema_migrations` table, one transaction per file, safe to re-run;
-`--list` shows pending). Files `0000–0005` are drizzle-kit legacy history
+`--list` shows pending), then versioned data backfills from
+`backend/drizzle/data_migrations/` (`data_migrations` table; lazy conversion
+is the default, eager backfills land here — never manual psql).
+Files `0000–0005` are drizzle-kit legacy history
 (applied via push back then, never replayable — fresh installs use
 `backend/schema.sql`); managed files start at `0006` and must be idempotent.
 Existing DBs get legacy stamped, new files really applied; empty DBs are
 rejected with «load schema.sql first». Every run ends with a sanity check
 that all `schema.sql` tables exist. Connection: `DATABASE_URL` (TCP) or
 `docker compose exec` (`COMPOSE_FILE`, `PGDB` overrides for prod/testing).
+
+Convention (enforced by the `migration-drift` CI job, which diffs a
+`schema.sql`+migrations database against a `drizzle-kit push` database):
+**every `schema/*.ts` change ships a numbered migration file + a `schema.sql`
+update**. The deploy workflow is the only runner — nothing is applied by hand.
 
 ### Backups
 
