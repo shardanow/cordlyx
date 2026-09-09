@@ -10,7 +10,9 @@ import { tags as tagsTable, itemTags } from '../../database/schema/tags.js';
 import { issueSequences } from '../../database/schema/sequences.js';
 import { itemStatuses, itemPriorities, itemTypes } from '../../database/schema/config.js';
 import { users } from '../../database/schema/users.js';
-import { eq, and, sql, desc, asc, gt, isNull, inArray, count } from 'drizzle-orm';
+import { eq, and, sql, desc, asc, gt, isNull, inArray, count, exists } from 'drizzle-orm';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 @Injectable()
 export class ItemsService {
@@ -212,8 +214,20 @@ export class ItemsService {
     if (filters.tagIds) {
       const tagIdList = filters.tagIds.split(',').filter(Boolean);
       if (tagIdList.length > 0) {
+        if (!tagIdList.every((id) => UUID_RE.test(id))) {
+          throw new BadRequestException('Invalid tag id in tagIds filter');
+        }
+        // Correlated EXISTS + inArray: each id is bound as its own uuid
+        // parameter. (The previous ANY($1::uuid[]) form sent the whole
+        // list as one text parameter and Postgres rejected it with
+        // "malformed array literal", so tag filtering never worked.)
         conditions.push(
-          sql`${items.id} IN (SELECT item_id FROM item_tags WHERE tag_id = ANY(${tagIdList}::uuid[]))`,
+          exists(
+            db
+              .select({ one: sql`1` })
+              .from(itemTags)
+              .where(and(eq(itemTags.itemId, items.id), inArray(itemTags.tagId, tagIdList))),
+          ),
         );
       }
     }
@@ -269,7 +283,7 @@ export class ItemsService {
       const cursor = lastItem
         ? Buffer.from(`${lastItem.createdAt.toISOString()}|${lastItem.id}`).toString('base64')
         : null;
-      return { data: result, meta: { cursor, hasMore, limit, total, page, totalPages } };
+      return { data: await this.withTags(result), meta: { cursor, hasMore, limit, total, page, totalPages } };
     }
 
     const result = await db
@@ -286,7 +300,31 @@ export class ItemsService {
       ? Buffer.from(`${lastItem.createdAt.toISOString()}|${lastItem.id}`).toString('base64')
       : null;
 
-    return { data, meta: { cursor, hasMore, limit, total } };
+    return { data: await this.withTags(data), meta: { cursor, hasMore, limit, total } };
+  }
+
+  /** Attach tags to a page of items with a single query (no N+1). */
+  private async withTags<T extends { id: string }>(rows: T[]) {
+    if (!rows.length) return rows.map((r) => ({ ...r, tags: [] }));
+    const db = getDb();
+    const tagRows = await db
+      .select({
+        itemId: itemTags.itemId,
+        id: tagsTable.id,
+        name: tagsTable.name,
+        color: tagsTable.color,
+      })
+      .from(itemTags)
+      .innerJoin(tagsTable, eq(itemTags.tagId, tagsTable.id))
+      .where(inArray(itemTags.itemId, rows.map((r) => r.id)));
+    const tagMap = new Map<string, { id: string; name: string; color: string | null }[]>();
+    for (const row of tagRows) {
+      if (!row.itemId) continue;
+      const list = tagMap.get(row.itemId) ?? [];
+      list.push({ id: row.id ?? '', name: row.name ?? '', color: row.color });
+      tagMap.set(row.itemId, list);
+    }
+    return rows.map((r) => ({ ...r, tags: tagMap.get(r.id) ?? [] }));
   }
 
   /** Direct children of one item (single level, for Tree UI drill-down). */

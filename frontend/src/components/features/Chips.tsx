@@ -20,17 +20,17 @@ export interface ChipTag {
   color: string | null;
 }
 
-/** Tag = filled pill in its own color. Distinct shape from relation chips. */
+/** Tag = filled pill in its own color (muted fallback when colorless). Distinct shape from relation chips. */
 export function TagChip({ tag, onRemove, small }: { tag: ChipTag; onRemove?: () => void; small?: boolean }) {
   return (
     <span
       className={cn(
-        'rounded-full font-semibold inline-flex items-center gap-1',
+        'rounded-full font-semibold inline-flex items-center gap-1 border border-border bg-muted/50 text-muted-foreground',
         small ? 'h-6 px-2.5 text-xs' : 'h-8 px-2.5 text-sm',
       )}
       style={
         tag.color
-          ? { color: tag.color, backgroundColor: `${tag.color}1f`, border: `1px solid ${tag.color}45` }
+          ? { color: tag.color, backgroundColor: `${tag.color}1f`, borderColor: `${tag.color}45` }
           : undefined
       }
     >
