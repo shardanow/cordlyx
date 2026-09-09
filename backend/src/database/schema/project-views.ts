@@ -9,6 +9,8 @@ export interface SavedViewFilters {
   assigneeId?: string;
   planId?: string;
   search?: string;
+  tagIds?: string[];
+  sort?: string;
 }
 
 export const projectViews = pgTable(

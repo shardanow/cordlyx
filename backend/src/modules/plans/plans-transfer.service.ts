@@ -19,7 +19,7 @@ export const plansBulkSchema = z.object({
   dryRun: z.boolean().optional().default(false),
 });
 
-const PLAN_CSV_HEADERS = ['Name', 'Type', 'Status', 'Description', 'Color'];
+const PLAN_CSV_HEADERS = ['Name', 'Type', 'Status', 'Description', 'Color', 'Start Date', 'End Date'];
 
 function mapPlanHeaders(row: Record<string, string>): Record<string, unknown> {
   const get = (...keys: string[]): string => {
@@ -40,6 +40,10 @@ function mapPlanHeaders(row: Record<string, string>): Record<string, unknown> {
   if (description) out.description = description;
   const color = get('Color', 'color');
   if (color) out.color = color;
+  const startDate = get('Start Date', 'Start', 'startDate', 'start_date');
+  if (startDate) out.startDate = startDate;
+  const endDate = get('End Date', 'End', 'endDate', 'end_date');
+  if (endDate) out.endDate = endDate;
   return out;
 }
 
@@ -56,6 +60,8 @@ export class PlansTransferService {
         status: plans.status,
         description: plans.description,
         color: plans.color,
+        startDate: plans.startDate,
+        endDate: plans.endDate,
       })
       .from(plans)
       .where(eq(plans.projectId, projectId))
@@ -65,7 +71,7 @@ export class PlansTransferService {
     if (format === 'jsonl') return rows.map((r) => JSON.stringify(r)).join('\n');
 
     const csvRows = rows.map((r) =>
-      [r.name, r.type, r.status, r.description ?? '', r.color ?? '']
+      [r.name, r.type, r.status, r.description ?? '', r.color ?? '', r.startDate ?? '', r.endDate ?? '']
         .map((v) => {
           const s = String(v ?? '');
           return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
@@ -147,7 +153,7 @@ export class PlansTransferService {
   }
 }
 
-/** createPlanSchema has no nullable fields — drop explicit nulls so exports round-trip. */
+/** createPlanSchema treats nulls as absent — drop explicit nulls so exports round-trip. */
 function stripNulls(value: unknown): unknown {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
   const out: Record<string, unknown> = {};

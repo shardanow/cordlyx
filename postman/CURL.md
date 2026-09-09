@@ -214,7 +214,11 @@ curl -X POST "$BASE/projects/:projectSlug/views" -H "$AUTH" -H 'Content-Type: ap
     "priorityId": null,
     "assigneeId": null,
     "planId": null,
-    "search": "string"
+    "search": "string",
+    "tagIds": [
+      "00000000-0000-0000-0000-000000000001"
+    ],
+    "sort": "string"
   },
   "isShared": true
 }'
@@ -232,7 +236,11 @@ curl -X PATCH "$BASE/projects/:projectSlug/views/:id" -H "$AUTH" -H 'Content-Typ
     "priorityId": null,
     "assigneeId": null,
     "planId": null,
-    "search": "string"
+    "search": "string",
+    "tagIds": [
+      "00000000-0000-0000-0000-000000000001"
+    ],
+    "sort": "string"
   },
   "isShared": true
 }'
@@ -420,11 +428,11 @@ curl -X POST "$BASE/projects/:projectSlug/config/import?dryRun=" -H "$AUTH" -F "
 
 ## items
 
-### GET /projects/:projectSlug/items?cursor=&limit=&typeId=&statusId=&priorityId=&assigneeId=&reporterId=&tagIds=&parentId=&planId=&search=&sort=
+### GET /projects/:projectSlug/items?cursor=&page=&limit=&typeId=&statusId=&priorityId=&assigneeId=&reporterId=&tagIds=&parentId=&planId=&search=&sort=
 List items (cursor pagination, filters). Supports If-None-Match/ETag.
 
 ```bash
-curl -X GET "$BASE/projects/:projectSlug/items?cursor=&limit=&typeId=&statusId=&priorityId=&assigneeId=&reporterId=&tagIds=&parentId=&planId=&search=&sort=" -H "$AUTH"
+curl -X GET "$BASE/projects/:projectSlug/items?cursor=&page=&limit=&typeId=&statusId=&priorityId=&assigneeId=&reporterId=&tagIds=&parentId=&planId=&search=&sort=" -H "$AUTH"
 ```
 
 ### POST /projects/:projectSlug/items
@@ -475,6 +483,20 @@ Import items from a CSV, JSON or JSONL file (max 10 MB, 100 rows)
 
 ```bash
 curl -X POST "$BASE/projects/:projectSlug/items/import?dedupe=&dryRun=" -H "$AUTH" -F "file=@data.csv"
+```
+
+### GET /projects/:projectSlug/items/meta/children-counts?ids=
+Children counts for given parent ids (?ids=a,b). Powers Tree expand chevrons.
+
+```bash
+curl -X GET "$BASE/projects/:projectSlug/items/meta/children-counts?ids=" -H "$AUTH"
+```
+
+### GET /projects/:projectSlug/items/:id/children
+List direct children of one item (for Tree view drill-down)
+
+```bash
+curl -X GET "$BASE/projects/:projectSlug/items/:id/children" -H "$AUTH"
 ```
 
 ### GET /projects/:projectSlug/items/:sequenceNum
@@ -598,6 +620,8 @@ curl -X POST "$BASE/projects/:projectSlug/plans" -H "$AUTH" -H 'Content-Type: ap
   "description": "string",
   "color": "string",
   "status": "active",
+  "startDate": null,
+  "endDate": null,
   "sortOrder": 1
 }'
 ```
@@ -612,6 +636,8 @@ curl -X PATCH "$BASE/projects/:projectSlug/plans/:id" -H "$AUTH" -H 'Content-Typ
   "description": "string",
   "color": "string",
   "status": "active",
+  "startDate": null,
+  "endDate": null,
   "sortOrder": 1
 }'
 ```
@@ -950,27 +976,27 @@ curl -X DELETE "$BASE/projects/:projectSlug/items/:itemId/relations/:id" -H "$AU
 
 ## Activities
 
-### GET /projects/:projectSlug/activity?cursor=&limit=&actorId=&action=&itemId=&sort=&dateFrom=&dateTo=
+### GET /projects/:projectSlug/activity?cursor=&page=&limit=&actorId=&action=&itemId=&sort=&dateFrom=&dateTo=
 Project activity timeline (cursor pagination, filters)
 
 ```bash
-curl -X GET "$BASE/projects/:projectSlug/activity?cursor=&limit=&actorId=&action=&itemId=&sort=&dateFrom=&dateTo=" -H "$AUTH"
+curl -X GET "$BASE/projects/:projectSlug/activity?cursor=&page=&limit=&actorId=&action=&itemId=&sort=&dateFrom=&dateTo=" -H "$AUTH"
 ```
 
-### GET /projects/:projectSlug/items/:itemId/activity?itemId=&cursor=&limit=&actorId=&action=&sort=&dateFrom=&dateTo=
+### GET /projects/:projectSlug/items/:itemId/activity?itemId=&cursor=&page=&limit=&actorId=&action=&sort=&dateFrom=&dateTo=
 Activity timeline of one item
 
 ```bash
-curl -X GET "$BASE/projects/:projectSlug/items/:itemId/activity?itemId=&cursor=&limit=&actorId=&action=&sort=&dateFrom=&dateTo=" -H "$AUTH"
+curl -X GET "$BASE/projects/:projectSlug/items/:itemId/activity?itemId=&cursor=&page=&limit=&actorId=&action=&sort=&dateFrom=&dateTo=" -H "$AUTH"
 ```
 
 ## Search
 
-### GET /search?cursor=&limit=&q=&projectId=
+### GET /search?cursor=&page=&limit=&q=&projectId=
 Full-text search across accessible items
 
 ```bash
-curl -X GET "$BASE/search?cursor=&limit=&q=&projectId=" -H "$AUTH"
+curl -X GET "$BASE/search?cursor=&page=&limit=&q=&projectId=" -H "$AUTH"
 ```
 
 ## api-keys

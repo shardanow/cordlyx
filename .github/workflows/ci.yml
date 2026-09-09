@@ -80,6 +80,48 @@ jobs:
       - name: Build
         run: npm run build
 
+  migration-drift:
+    # Proves schema.ts, backend/schema.sql and backend/drizzle/migrations/
+    # agree with each other. Read-only vs scratch databases — this job has
+    # no prod access and applies nothing anywhere: the Deploy workflow is
+    # the only place that runs migrations. A schema.ts change without a
+    # migration file fails here, so Deploy can never ship it.
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: cordlyx
+          POSTGRES_PASSWORD: cordlyx
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+
+      - run: npm ci
+
+      - run: npm run build -w packages/shared
+
+      - run: npm run build -w backend
+
+      - name: Check schema drift (schema.ts vs schema.sql + migrations)
+        run: ./scripts/check-schema-drift.sh
+        env:
+          DRIFT_BASE_URL: postgres://cordlyx:cordlyx@localhost:5432/postgres
+
   e2e:
     runs-on: ubuntu-latest
     needs: lint-and-test

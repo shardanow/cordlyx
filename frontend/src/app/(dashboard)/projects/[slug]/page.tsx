@@ -18,6 +18,10 @@ import { TypeBadge } from '@/components/features/TypeBadge';
 import { StatusDot } from '@/components/features/StatusDot';
 import { AssigneePicker } from '@/components/features/AssigneePicker';
 import { FilterBar } from '@/components/features/FilterBar';
+import { Pagination } from '@/components/features/Pagination';
+import { TagChip } from '@/components/features/Chips';
+import { TreeChildren } from '@/components/features/TreeChildren';
+import { bodyExcerpt } from '@/lib/markdown';
 import { useProjectData } from '@/lib/project-data';
 import { AvatarCircle } from '@/components/features/AvatarCircle';
 import { TypeIcon } from '@/components/features/TypeIcon';
@@ -25,7 +29,7 @@ import { Select, SelectTrigger, SelectContent, SelectOption } from '@/components
 import { Target } from 'lucide-react';
 import {
   Search, Flag, User, Calendar, Plus,
-  RotateCcw, Bookmark, ChevronLeft, ChevronRight,
+  RotateCcw, Bookmark, ChevronDown, ChevronRight as ChevronRightIcon,
   CircleDot, ListTodo, Trash2, ArrowUp, ArrowDown,
 } from 'lucide-react';
 
@@ -41,6 +45,7 @@ interface Item {
   statusId: string;
   priorityId: string;
   assigneeId: string | null;
+  parentId: string | null;
   planId: string | null;
   description: string | null;
   createdAt: string;
@@ -85,16 +90,20 @@ export default function ProjectItemsPage() {
   const [filterPriority, setFilterPriority] = useState('');
   const [filterAssignee, setFilterAssignee] = useState('');
   const [filterPlan, setFilterPlan] = useState('');
+  const [filterTags, setFilterTags] = useState<string[]>([]);
   const [sort, setSort] = useState<SortValue>('-created_at');
   const [activeTab, setActiveTab] = useState('all');
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [cursorStack, setCursorStack] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [viewMode, setViewMode] = useState<'flat' | 'tree' | 'group'>('flat');
+  const [groupBy, setGroupBy] = useState<'status' | 'type' | 'assignee' | 'plan' | 'tag'>('status');
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  // Reset cursor when filters change
+  // Reset page when filters change
   useEffect(() => {
-    setCursor(null);
-    setCursorStack([]);
-  }, [debouncedSearch, filterType, filterStatus, filterPriority, filterAssignee, filterPlan, sort]);
+    setPage(1);
+    setExpanded(new Set());
+  }, [debouncedSearch, filterType, filterStatus, filterPriority, filterAssignee, filterPlan, filterTags, sort, viewMode, groupBy]);
 
   const currentFilters = {
     search: debouncedSearch,
@@ -103,6 +112,8 @@ export default function ProjectItemsPage() {
     priorityId: filterPriority,
     assigneeId: filterAssignee,
     planId: filterPlan,
+    tagIds: filterTags,
+    sort,
   };
 
   const handleSaveView = async () => {
@@ -124,6 +135,8 @@ export default function ProjectItemsPage() {
     setFilterPriority(f.priorityId ?? '');
     setFilterAssignee(f.assigneeId ?? '');
     setFilterPlan(f.planId ?? '');
+    setFilterTags(f.tagIds ?? []);
+    if (f.sort) setSort(f.sort as SortValue);
     setSearch(f.search ?? '');
     setDebouncedSearch(f.search ?? '');
     setActiveTab(view.id);
@@ -171,7 +184,7 @@ export default function ProjectItemsPage() {
   const handleTabClick = (tab: string) => {
     setActiveTab(tab);
     if (tab === 'all') {
-      setFilterType(''); setFilterStatus(''); setFilterPriority(''); setFilterAssignee('');
+      setFilterType(''); setFilterStatus(''); setFilterPriority(''); setFilterAssignee(''); setFilterPlan(''); setFilterTags([]);
     } else if (tab === 'my') {
       setFilterType(''); setFilterStatus(''); setFilterPriority('');
       setFilterAssignee(currentUser?.id ?? '');
@@ -180,37 +193,40 @@ export default function ProjectItemsPage() {
 
   const clearFilters = () => {
     setSearch(''); setDebouncedSearch('');
-    setFilterType(''); setFilterStatus(''); setFilterPriority(''); setFilterAssignee(''); setFilterPlan('');
+    setFilterType(''); setFilterStatus(''); setFilterPriority(''); setFilterAssignee(''); setFilterPlan(''); setFilterTags([]);
     setActiveTab('all');
     searchRef.current?.focus();
   };
 
-  const hasFilters = search || filterType || filterStatus || filterPriority || filterAssignee || filterPlan;
+  const hasFilters = Boolean(search || filterType || filterStatus || filterPriority || filterAssignee || filterPlan || filterTags.length);
 
   const params = useMemo(() => {
-    const p = new URLSearchParams({ limit: '50', sort });
+    const p = new URLSearchParams({ limit: String(limit), page: String(page), sort });
     if (debouncedSearch) p.set('search', debouncedSearch);
     if (filterType) p.set('typeId', filterType);
     if (filterStatus) p.set('statusId', filterStatus);
     if (filterPriority) p.set('priorityId', filterPriority);
     if (filterAssignee) p.set('assigneeId', filterAssignee);
     if (filterPlan) p.set('planId', filterPlan);
-    if (cursor) p.set('cursor', cursor);
+    if (filterTags.length) p.set('tagIds', filterTags.join(','));
     return p;
-  }, [debouncedSearch, filterType, filterStatus, filterPriority, filterAssignee, filterPlan, sort, cursor]);
+  }, [debouncedSearch, filterType, filterStatus, filterPriority, filterAssignee, filterPlan, filterTags, sort, page, limit]);
 
   const { data: project } = useQuery<Project>({
     queryKey: ['project', slug],
     queryFn: () => api.get(`/projects/${slug}`),
   });
 
-  const { data, isLoading } = useQuery<{ data: Item[]; meta: { cursor: string | null; hasMore: boolean } }>({
+  const { data, isLoading } = useQuery<{ data: Item[]; meta: { cursor: string | null; hasMore: boolean; total?: number; page?: number; totalPages?: number; limit: number } }>({
     queryKey: ['items', slug, params.toString()],
     queryFn: () => api.get(`/projects/${slug}/items?${params.toString()}`),
     placeholderData: (previousData) => previousData,
   });
 
-  const { types, statuses, priorities, members, plans } = useProjectData(slug);
+  const { types, statuses, priorities, members, plans, tags } = useProjectData(slug);
+  const total = data?.meta?.total ?? 0;
+  const totalPages = data?.meta?.totalPages ?? 1;
+  const currentPage = data?.meta?.page ?? page;
 
   const handleUpdate = async (itemId: string, field: string, value: string | null) => {
     try {
@@ -254,6 +270,59 @@ export default function ProjectItemsPage() {
 
   const items = data?.data ?? [];
 
+  // Children counts for Tree expand chevrons (single batched request per page).
+  const visibleIds = useMemo(() => items.map((i) => i.id), [data]);
+  const { data: childrenCountsData } = useQuery<{ data: Record<string, number> }>({
+    queryKey: ['children-counts', slug, visibleIds.join(',')],
+    queryFn: () =>
+      visibleIds.length
+        ? api.get(`/projects/${slug}/items/meta/children-counts?ids=${visibleIds.join(',')}`)
+        : Promise.resolve({ data: {} }),
+    enabled: viewMode === 'tree' && visibleIds.length > 0,
+    placeholderData: (prev) => prev,
+  });
+  const childrenCounts: Record<string, number> = childrenCountsData?.data ?? {};
+
+  const toggleExpand = (id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const displayGroups = useMemo(() => {
+    if (viewMode !== 'group') return null;
+    const groups = new Map<string, { label: string; color?: string | null; items: typeof items }>();
+    const keyOf = (item: (typeof items)[0]) => {
+      if (groupBy === 'status') {
+        const s = statuses.find((x) => x.id === item.statusId);
+        return { key: item.statusId, label: s?.name ?? 'No status', color: s?.color };
+      }
+      if (groupBy === 'type') {
+        const t = types.find((x) => x.id === item.typeId);
+        return { key: item.typeId, label: t?.name ?? 'No type', color: t?.color };
+      }
+      if (groupBy === 'assignee') {
+        const m = members.find((x) => x.userId === item.assigneeId);
+        return { key: item.assigneeId ?? 'unassigned', label: m?.name ?? 'Unassigned' };
+      }
+      if (groupBy === 'plan') {
+        const p = plans.find((x) => x.id === item.planId);
+        return { key: item.planId ?? 'no-plan', label: p?.name ?? 'No plan / sprint', color: p?.color };
+      }
+      const firstTag = (item.tags ?? [])[0];
+      return { key: firstTag?.id ?? 'untagged', label: firstTag?.name ?? 'Untagged', color: firstTag?.color };
+    };
+    for (const it of items) {
+      const g = keyOf(it);
+      if (!groups.has(g.key)) groups.set(g.key, { label: g.label, color: g.color, items: [] });
+      groups.get(g.key)!.items.push(it);
+    }
+    return [...groups.entries()];
+  }, [viewMode, groupBy, items, statuses, types, members, plans]);
+
   if (isLoading) return (
     <div className="space-y-4">
       <div className="h-4 w-48 rounded bg-muted animate-pulse" />
@@ -286,7 +355,12 @@ export default function ProjectItemsPage() {
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{project?.name ?? slug}</h1>
-            <p className="text-base md:text-lg text-muted-foreground">{items.length} items in this project</p>
+            <p className="text-base md:text-lg text-muted-foreground">
+              {total} items in this project
+              {hasFilters && items.length !== total && (
+                <span> · showing {items.length} on this page</span>
+              )}
+            </p>
           </div>
           <div className="flex items-center gap-2.5">
             <button
@@ -435,7 +509,7 @@ export default function ProjectItemsPage() {
       </div>
 
       <FilterBar
-        values={{ search, debouncedSearch, typeId: filterType, statusId: filterStatus, priorityId: filterPriority, assigneeId: filterAssignee, planId: filterPlan }}
+        values={{ search, debouncedSearch, typeId: filterType, statusId: filterStatus, priorityId: filterPriority, assigneeId: filterAssignee, planId: filterPlan, tagIds: filterTags }}
         onSearch={setSearch}
         onClearSearch={() => { setSearch(''); setDebouncedSearch(''); searchRef.current?.focus(); }}
         onChange={(patch) => {
@@ -444,8 +518,9 @@ export default function ProjectItemsPage() {
           if (patch.priorityId !== undefined) setFilterPriority(patch.priorityId);
           if (patch.assigneeId !== undefined) setFilterAssignee(patch.assigneeId);
           if (patch.planId !== undefined) setFilterPlan(patch.planId);
+          if (patch.tagIds !== undefined) setFilterTags(patch.tagIds);
         }}
-        data={{ types, statuses, priorities, members, plans }}
+        data={{ types, statuses, priorities, members, plans, tags }}
         layout="grid"
         searchRef={searchRef}
         trailing={hasFilters ? (
@@ -458,6 +533,38 @@ export default function ProjectItemsPage() {
           </button>
         ) : undefined}
       />
+
+      {/* View mode: flat list, hierarchy tree (parentId), or grouping */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="inline-flex rounded-[10px] border border-border bg-card p-1">
+          {(['flat', 'tree', 'group'] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setViewMode(m)}
+              className={`h-9 px-4 rounded-lg text-sm font-bold capitalize transition-colors ${viewMode === m ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              {m === 'flat' ? 'List' : m === 'tree' ? 'Tree' : 'Group'}
+            </button>
+          ))}
+        </div>
+        {viewMode === 'group' && (
+          <Select value={groupBy} onChange={(v) => setGroupBy(v as typeof groupBy)}>
+            <SelectTrigger className="h-10 rounded-[10px] border border-border bg-card px-3 text-sm font-bold">
+              Group by: {groupBy}
+            </SelectTrigger>
+            <SelectContent>
+              <SelectOption value="status">Status</SelectOption>
+              <SelectOption value="type">Type</SelectOption>
+              <SelectOption value="assignee">Assignee</SelectOption>
+              <SelectOption value="plan">Plan / Sprint</SelectOption>
+              <SelectOption value="tag">Tag</SelectOption>
+            </SelectContent>
+          </Select>
+        )}
+        {viewMode === 'tree' && (
+          <span className="text-sm text-muted-foreground">Nested by parent — expand rows to load children.</span>
+        )}
+      </div>
 
       <div className="overflow-x-auto">
         {/* List header (desktop only) — sortable */}
@@ -504,7 +611,29 @@ export default function ProjectItemsPage() {
 
       {/* Items list */}
       <div className="space-y-3">
-        {items.map((item) => {
+        {(viewMode === 'group' ? (displayGroups?.flatMap(([, g]) => g.items) ?? items) : items).map((item, idx, arr) => {
+          const groupHeader = (() => {
+            if (viewMode !== 'group' || !displayGroups) return null;
+            const labelOf = (it: typeof item) => {
+              if (groupBy === 'status') return statuses.find((x) => x.id === it.statusId)?.name ?? 'No status';
+              if (groupBy === 'type') return types.find((x) => x.id === it.typeId)?.name ?? 'No type';
+              if (groupBy === 'assignee') return members.find((x) => x.userId === it.assigneeId)?.name ?? 'Unassigned';
+              if (groupBy === 'plan') return plans.find((x) => x.id === it.planId)?.name ?? 'No plan / sprint';
+              return (it.tags ?? [])[0]?.name ?? 'Untagged';
+            };
+            const prev = idx > 0 ? labelOf(arr[idx - 1]) : null;
+            const cur = labelOf(item);
+            if (prev === cur) return null;
+            const count = arr.filter((x) => labelOf(x) === cur).length;
+            return (
+              <div className="flex items-center gap-2 pt-2 first:pt-0">
+                <span className="text-sm font-bold">{cur}</span>
+                <span className="text-xs text-muted-foreground">· {count} on this page</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+            );
+          })();
+          const row = (() => {
           const type = types?.find((t) => t.id === item.typeId);
           const status = statuses?.find((s) => s.id === item.statusId);
           const priority = priorities?.find((p) => p.id === item.priorityId);
@@ -542,19 +671,13 @@ export default function ProjectItemsPage() {
                   </div>
                   {item.description && (
                     <div className="text-xs text-muted-foreground truncate max-w-[680px] mb-1.5">
-                      {item.description.replace(/<[^>]+>/g, '').substring(0, 80) + (item.description.length > 80 ? '...' : '')}
+                      {bodyExcerpt(item.description, 80)}
                     </div>
                   )}
                   {(item.tags ?? []).length > 0 && (
                     <div className="flex gap-1.5 flex-wrap">
                       {(item.tags ?? []).map((tag) => (
-                        <span
-                          key={tag.id}
-                          className="h-6 px-2.5 rounded-full bg-muted text-muted-foreground text-xs font-semibold inline-flex items-center"
-                          style={tag.color ? { color: tag.color, backgroundColor: `${tag.color}18` } : undefined}
-                        >
-                          {tag.name}
-                        </span>
+                        <TagChip key={tag.id} tag={tag} small />
                       ))}
                     </div>
                   )}
@@ -698,7 +821,7 @@ export default function ProjectItemsPage() {
                       <span className="text-sm font-bold truncate text-foreground">{item.title}</span>
                     </div>
                     {item.description && (
-                      <div className="text-xs text-muted-foreground truncate">{item.description.replace(/<[^>]+>/g, '').substring(0, 60)}</div>
+                      <div className="text-xs text-muted-foreground truncate">{bodyExcerpt(item.description, 60)}</div>
                     )}
                     {plan && (
                       <div className="flex items-center gap-1.5">
@@ -722,6 +845,34 @@ export default function ProjectItemsPage() {
               </Link>
             </div>
           );
+          })();
+          return (
+            <div key={`${item.id}-${idx}`}>
+              {groupHeader}
+              {row}
+              {viewMode === 'tree' && (childrenCounts[item.id] ?? 0) > 0 && (
+                <button
+                  onClick={() => toggleExpand(item.id)}
+                  className="mt-1 ml-1 inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-foreground"
+                >
+                  {expanded.has(item.id) ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRightIcon className="w-3.5 h-3.5" />}
+                  {expanded.has(item.id) ? 'Hide subtasks' : `Subtasks (${childrenCounts[item.id]})`}
+                </button>
+              )}
+              {viewMode === 'tree' && expanded.has(item.id) && (
+                <TreeChildren
+                  slug={slug as string}
+                  parentId={item.id}
+                  depth={1}
+                  types={types}
+                  statuses={statuses}
+                  priorities={priorities}
+                  members={members}
+                  plans={plans}
+                />
+              )}
+            </div>
+          );
         })}
 
         {items.length === 0 && (
@@ -734,34 +885,18 @@ export default function ProjectItemsPage() {
       </div>
 
       {/* Bottom line + pagination */}
-      {items.length > 0 && Boolean((data?.meta?.cursor && data?.meta?.hasMore) || cursorStack.length > 0) && (
-        <div className="flex items-center justify-between gap-4 mt-6 text-base text-muted-foreground">
-          <span>{items.length} items</span>
-          <div className="flex items-center gap-2">
-            <button
-              disabled={cursorStack.length === 0}
-              onClick={() => {
-                const prev = cursorStack.pop()!;
-                setCursorStack([...cursorStack]);
-                setCursor(prev || null);
-              }}
-              className="w-[46px] h-[46px] rounded-[10px] border border-border bg-card text-muted-foreground grid place-items-center disabled:opacity-50 disabled:cursor-default hover:bg-muted transition-colors"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            {Boolean(data?.meta?.cursor && data?.meta?.hasMore) && (
-              <button
-                onClick={() => {
-                  setCursorStack((s) => [...s, cursor ?? '']);
-                  if (data?.meta?.cursor) setCursor(data.meta.cursor);
-                }}
-                className="w-[46px] h-[46px] rounded-[10px] border border-border bg-card text-muted-foreground grid place-items-center hover:bg-muted transition-colors"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            )}
-          </div>
-        </div>
+      {items.length > 0 && (
+        <Pagination
+          page={currentPage}
+          totalPages={totalPages}
+          total={total}
+          limit={limit}
+          onPage={(p) => setPage(p)}
+          onLimit={(l) => {
+            setLimit(l);
+            setPage(1);
+          }}
+        />
       )}
 
       <QuickCreateModal open={quickCreateOpen} onClose={() => setQuickCreateOpen(false)} />

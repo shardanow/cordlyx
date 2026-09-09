@@ -234,9 +234,17 @@ no required status checks — CI runs only post-merge).
 
 CI (`lint-and-test`) runs **once per release**, on push to `main` only
 (docs-only changes are ignored). Green run triggers `Deploy`, which SSHes
-into the VPS and runs: `git pull` → DB backup → `compose up -d --build` →
-`pg_isready` → health retries on `http://localhost:3005/health`. Red run =
+into the VPS and runs: `git pull` → DB backup (hard gate: no fresh dump =
+stop) → `scripts/migrate.sh` → `compose up -d --build` →
+`pg_isready` → health retries on `http://localhost:3005/health` →
+auto-rollback to the previous SHA on health failure. Red run =
 no deploy. Rollback: Actions → Deploy → Run workflow → `ref` = previous SHA.
+
+Database changes always ship as numbered files in
+`backend/drizzle/migrations/` (+ `backend/schema.sql` update) — the
+`migration-drift` CI job fails the build if `schema/*.ts` drifts from what
+schema.sql + migrations produce. Deploy is the only thing that applies
+migrations; nothing is ever run by hand against prod.
 
 Run `npm test` locally before opening a PR to `main` — it replaces the
 missing PR checks.

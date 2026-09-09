@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # Applies pending SQL migrations from backend/drizzle/migrations/ with
 # version tracking, one transaction per file. Safe to re-run.
+# Afterwards runs pending data migrations from backend/drizzle/data_migrations/
+# (batched, idempotent backfills — tracked in data_migrations table).
+#
+# Convention: EVERY schema.ts change ships a numbered migration file here
+# (hand-written, idempotent, IF NOT EXISTS style — see 0006..0011).
+# CI (migration-drift job) fails the build if schema.ts drifts from what
+# schema.sql + these files produce. The deploy workflow runs this script
+# over SSH before starting new code; it never runs anywhere else against prod.
 #
 # Connection (first match wins):
 #   DATABASE_URL=postgres://... ./scripts/migrate.sh   # TCP (CI, local with exposed ports)
@@ -113,3 +121,22 @@ while read -r table; do
 done < <(grep -oP 'CREATE TABLE \K\w+' "$SCHEMA_SQL" | sort -u)
 [ "$missing" -eq 0 ] || fail "schema sanity check failed"
 log "schema sanity check OK"
+
+# --- data migrations (batched backfills, idempotent, one transaction each) ---
+# Default pattern for data changes is lazy conversion at read/write time
+# (no eager backfill needed). When an eager backfill IS required, it lands
+# here as a numbered, idempotent, resumable SQL script — never as a manual psql.
+psql_exec -c "CREATE TABLE IF NOT EXISTS data_migrations (version TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT now());" > /dev/null
+data_applied="$(psql_exec -tAc "SELECT version FROM data_migrations;" | tr -d ' \r' | grep -v '^$' || true)"
+data_count=0
+for f in "$ROOT_DIR/backend/drizzle/data_migrations"/[0-9]*.sql; do
+  [ -f "$f" ] || continue
+  v="$(basename "$f" .sql)"
+  if echo "$data_applied" | grep -qx "$v"; then continue; fi
+  log "applying data migration $v ..."
+  psql_file "$f" || fail "data migration $v failed — database left unchanged for this file"
+  psql_exec -c "INSERT INTO data_migrations (version) VALUES ('$v');" > /dev/null
+  log "  applied data migration $v"
+  data_count=$((data_count + 1))
+done
+log "$data_count data migration(s) applied"

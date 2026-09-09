@@ -40,6 +40,7 @@ jobs:
             COMPOSE="docker compose -f docker-compose.prod.yml"
 
             cd "$PROJECT_DIR"
+            PREV_SHA="$(git rev-parse HEAD)"
             git fetch origin
             if [ "$REF" = "main" ] || [ "$REF" = "master" ]; then
               git checkout "$REF"
@@ -48,10 +49,16 @@ jobs:
               git fetch origin "$REF"
               git checkout --detach FETCH_HEAD
             fi
-            echo "Deployed ref: $(git rev-parse --short HEAD)"
+            echo "Deployed ref: $(git rev-parse --short HEAD) (previous: $(git rev-parse --short "$PREV_SHA"))"
 
-            # Backup DB before touching running services (best effort, never blocks deploy)
-            ./backup/backup.sh --db || true
+            # Backup DB before touching running services. HARD GATE:
+            # no fresh dump = stop here, nothing else runs.
+            DEPLOY_START="$(date +%s)"
+            ./backup/backup.sh --db
+            DUMP="$(ls -t backups/dump_*.sql 2>/dev/null | head -1)"
+            [ -n "${DUMP:-}" ] && [ -s "$DUMP" ] && [ "$(stat -c %Y "$DUMP")" -ge "$DEPLOY_START" ] \
+              || { echo "backup gate failed: no fresh dump in backups/"; exit 1; }
+            echo "Backup gate OK: $DUMP ($(du -h "$DUMP" | cut -f1))"
 
             # Apply pending DB migrations BEFORE new code starts.
             # migrate.sh is idempotent; any failure stops the deploy here
@@ -74,19 +81,34 @@ jobs:
             done
             $COMPOSE exec -T postgres pg_isready -U cordlyx
 
+            wait_health() {
+              for i in $(seq 1 45); do
+                if curl --fail --max-time 5 http://localhost:3005/health >/dev/null 2>&1; then
+                  echo "API healthy"
+                  return 0
+                fi
+                sleep 2
+              done
+              return 1
+            }
+
             echo "Waiting for API health..."
-            for i in $(seq 1 45); do
-              if curl --fail --max-time 5 http://localhost:3005/health >/dev/null 2>&1; then
-                echo "API healthy"
-                break
+            if ! wait_health; then
+              echo "=== api logs ==="
+              $COMPOSE logs --tail 30 api || true
+              echo "=== nginx logs ==="
+              $COMPOSE logs --tail 15 nginx || true
+              # AUTO-ROLLBACK: new code is unhealthy — go back to the
+              # previously serving ref and rebuild, no human needed.
+              echo "Health gate failed — rolling back to $PREV_SHA"
+              git checkout --detach "$PREV_SHA"
+              $COMPOSE up -d --build
+              $COMPOSE up -d --force-recreate nginx
+              if wait_health; then
+                echo "Rollback healthy on $PREV_SHA"
+              else
+                echo "Rollback ALSO unhealthy — DB dump available at $DUMP, needs investigation"
               fi
-              if [ "$i" -eq 45 ]; then
-                echo "=== api logs ==="
-                $COMPOSE logs --tail 30 api || true
-                echo "=== nginx logs ==="
-                $COMPOSE logs --tail 15 nginx || true
-                exit 1
-              fi
-              sleep 2
-            done
+              exit 1
+            fi
             $COMPOSE ps

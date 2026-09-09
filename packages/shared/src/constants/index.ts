@@ -7,7 +7,7 @@ export type StatusCategory = (typeof STATUS_CATEGORIES)[number];
 export const RELATION_TYPES = ['blocks', 'depends_on', 'relates_to', 'duplicates', 'child_of', 'next_action'] as const;
 export type RelationType = (typeof RELATION_TYPES)[number];
 
-export const PLAN_TYPES = ['release', 'milestone', 'campaign', 'goal', 'custom'] as const;
+export const PLAN_TYPES = ['release', 'milestone', 'campaign', 'goal', 'sprint', 'custom'] as const;
 export type PlanType = (typeof PLAN_TYPES)[number];
 
 export const PLAN_STATUSES = ['active', 'completed', 'cancelled'] as const;

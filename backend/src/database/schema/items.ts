@@ -10,6 +10,7 @@ import {
   unique,
   index,
 } from 'drizzle-orm/pg-core';
+import { isNull } from 'drizzle-orm';
 import { projects } from './projects.js';
 import { users } from './users.js';
 import { itemTypes, itemStatuses, itemPriorities } from './config.js';
@@ -52,5 +53,6 @@ export const items = pgTable(
     unique().on(table.projectId, table.sequenceNum),
     index('idx_items_status_sort').on(table.statusId, table.sortOrder),
     index('idx_items_project_created').on(table.projectId, table.createdAt),
+    index('idx_items_parent').on(table.parentId).where(isNull(table.deletedAt)),
   ],
 );

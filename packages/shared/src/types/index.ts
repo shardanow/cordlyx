@@ -6,6 +6,9 @@ export interface PaginationMeta {
   cursor: string | null;
   hasMore: boolean;
   limit: number;
+  total?: number;
+  page?: number;
+  totalPages?: number;
 }
 
 export interface ApiResponse<T> {

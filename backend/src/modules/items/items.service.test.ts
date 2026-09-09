@@ -191,6 +191,56 @@ describe('ItemsService', () => {
       expect(result.meta.hasMore).toBe(false);
       expect(result.meta.cursor).toBeNull();
     });
+
+    it('should return filtered total with page mode', async () => {
+      const p1 = await itemsService.list(projectId, { limit: 2, page: 1, sort: '-created_at' });
+      expect(p1.meta.total).toBeGreaterThanOrEqual(p1.data.length);
+      expect(p1.meta.page).toBe(1);
+      expect(p1.meta.totalPages).toBeGreaterThanOrEqual(1);
+      const p2 = await itemsService.list(projectId, { limit: 2, page: 2, sort: '-created_at' });
+      expect(p2.meta.page).toBe(2);
+      // Pages must not overlap (stable sort with id tiebreaker).
+      const ids1 = new Set(p1.data.map((i) => i.id));
+      expect(p2.data.some((i) => ids1.has(i.id))).toBe(false);
+      // Total is consistent across pages.
+      expect(p2.meta.total).toBe(p1.meta.total);
+    });
+
+    it('should return total in cursor mode too (for headers)', async () => {
+      const result = await itemsService.list(projectId, { limit: 5, sort: '-created_at' });
+      expect(result.meta.total).toBeGreaterThanOrEqual(result.data.length);
+    });
+  });
+
+  describe('hierarchy (parentId tree)', () => {
+    it('should count children and list them, and block cycles', async () => {
+      const parent = await itemsService.create(
+        projectId, { title: 'Tree parent', typeId: taskTypeId }, testUser.id,
+      );
+      const child = await itemsService.create(
+        projectId, { title: 'Tree child', typeId: taskTypeId, parentId: parent!.id }, testUser.id,
+      );
+      const grandchild = await itemsService.create(
+        projectId, { title: 'Tree grandchild', typeId: taskTypeId, parentId: child!.id }, testUser.id,
+      );
+      expect(grandchild).not.toBeNull();
+
+      const counts = await itemsService.childrenCounts(projectId, [parent!.id, child!.id]);
+      expect(counts[parent!.id]).toBe(1);
+      expect(counts[child!.id]).toBe(1);
+
+      const listed = await itemsService.listChildren(projectId, parent!.id);
+      expect(listed.data.some((i) => i.id === child!.id)).toBe(true);
+
+      // Reparenting parent under its own grandchild must fail.
+      await expect(
+        itemsService.update(projectId, parent!.id, { parentId: grandchild!.id }),
+      ).rejects.toThrow();
+      // Self-parent must fail.
+      await expect(
+        itemsService.update(projectId, parent!.id, { parentId: parent!.id }),
+      ).rejects.toThrow();
+    });
   });
 
   describe('edge cases', () => {
