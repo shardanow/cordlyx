@@ -124,6 +124,31 @@ describe('FilterBar', () => {
     fireEvent.click(screen.getByText('frontend'));
     expect(onChange).toHaveBeenCalledWith({ tagIds: ['g1'] });
   });
+
+  it('shows a spinner while search input waits for debounce', () => {
+    const { container } = renderBar({
+      values: { ...baseValues, search: 'abc', debouncedSearch: 'ab' },
+    });
+    expect(container.querySelector('.animate-spin')).toBeInTheDocument();
+  });
+
+  it('shows no spinner once search has settled', () => {
+    const { container } = renderBar({
+      values: { ...baseValues, search: 'abc', debouncedSearch: 'abc' },
+    });
+    expect(container.querySelector('.animate-spin')).not.toBeInTheDocument();
+  });
+
+  it('tags trigger has a chevron and full-width dropdown', () => {
+    renderBar();
+    const btn = screen.getByText('Tags: All').closest('button')!;
+    expect(btn).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(btn);
+    expect(btn).toHaveAttribute('aria-expanded', 'true');
+    const panel = btn.parentElement!.querySelector('.absolute');
+    expect(panel?.className).toMatch(/left-0/);
+    expect(panel?.className).toMatch(/right-0/);
+  });
 });
 
 describe('TagChip', () => {

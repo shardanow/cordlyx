@@ -13,6 +13,7 @@ import { getAccessToken } from '@/lib/api-client';
 import { toast } from 'sonner';
 import QuickCreateModal from '@/components/QuickCreateModal';
 import ImportItemsModal from '@/components/ImportItemsModal';
+import Spinner from '@/components/Spinner';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { TypeBadge } from '@/components/features/TypeBadge';
 import { StatusDot } from '@/components/features/StatusDot';
@@ -217,11 +218,14 @@ export default function ProjectItemsPage() {
     queryFn: () => api.get(`/projects/${slug}`),
   });
 
-  const { data, isLoading } = useQuery<{ data: Item[]; meta: { cursor: string | null; hasMore: boolean; total?: number; page?: number; totalPages?: number; limit: number } }>({
+  const { data, isLoading, isFetching } = useQuery<{ data: Item[]; meta: { cursor: string | null; hasMore: boolean; total?: number; page?: number; totalPages?: number; limit: number } }>({
     queryKey: ['items', slug, params.toString()],
     queryFn: () => api.get(`/projects/${slug}/items?${params.toString()}`),
     placeholderData: (previousData) => previousData,
   });
+  // Background refetch (filter/search/page change) keeps stale rows visible —
+  // dim them + show "Updating" so the wait has visible feedback.
+  const refreshing = isFetching && !!data;
 
   const { types, statuses, priorities, members, plans, tags } = useProjectData(slug);
   const total = data?.meta?.total ?? 0;
@@ -355,10 +359,16 @@ export default function ProjectItemsPage() {
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{project?.name ?? slug}</h1>
-            <p className="text-base md:text-lg text-muted-foreground">
+            <p className="text-base md:text-lg text-muted-foreground inline-flex items-center gap-2">
               {total} items in this project
               {hasFilters && items.length !== total && (
                 <span> · showing {items.length} on this page</span>
+              )}
+              {refreshing && (
+                <span className="inline-flex items-center gap-1.5 text-sm" role="status">
+                  <Spinner size="sm" />
+                  Updating…
+                </span>
               )}
             </p>
           </div>
@@ -610,7 +620,10 @@ export default function ProjectItemsPage() {
       </div>
 
       {/* Items list */}
-      <div className="space-y-3">
+      <div
+        className={`space-y-3 transition-opacity duration-200 ${refreshing ? 'opacity-60' : ''}`}
+        aria-busy={refreshing}
+      >
         {(viewMode === 'group' ? (displayGroups?.flatMap(([, g]) => g.items) ?? items) : items).map((item, idx, arr) => {
           const groupHeader = (() => {
             if (viewMode !== 'group' || !displayGroups) return null;
