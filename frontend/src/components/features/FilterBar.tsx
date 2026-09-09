@@ -2,7 +2,8 @@
 
 import type { RefObject } from 'react';
 import { useState, useRef, useEffect } from 'react';
-import { Search, ListTodo, CircleDot, Flag, User, Target, Tags } from 'lucide-react';
+import { Search, ListTodo, CircleDot, Flag, User, Target, Tags, ChevronDown } from 'lucide-react';
+import Spinner from '@/components/Spinner';
 import { Select, SelectTrigger, SelectContent, SelectOption } from '@/components/ui/select';
 import { AvatarCircle } from '@/components/features/AvatarCircle';
 import { TypeIcon } from '@/components/features/TypeIcon';
@@ -85,7 +86,11 @@ export function FilterBar({
         layout === 'row' && 'w-[220px] shrink-0',
       )}
     >
-      <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+      {values.search !== values.debouncedSearch ? (
+        <Spinner size="sm" className="shrink-0" />
+      ) : (
+        <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+      )}
       <input
         ref={searchRef}
         type="text"
@@ -217,19 +222,21 @@ export function FilterBar({
         </Select>
       )}
 
-      <div ref={tagsRef} className="relative">
+      <div ref={tagsRef} className={cn('relative', layout === 'row' && 'shrink-0')}>
         <button
           type="button"
           onClick={() => setTagsOpen((o) => !o)}
+          aria-expanded={tagsOpen}
           className={triggerClass((values.tagIds ?? []).length > 0, layout)}
         >
           <Tags className="w-4 h-4 shrink-0" />
           <span className="truncate">
             {(values.tagIds ?? []).length > 0 ? `Tags: ${(values.tagIds ?? []).length}` : 'Tags: All'}
           </span>
+          <ChevronDown className={cn('w-3.5 h-3.5 text-muted-foreground shrink-0 ml-auto transition-transform', tagsOpen && 'rotate-180')} />
         </button>
         {tagsOpen && (
-          <div className="absolute z-50 mt-1 min-w-[220px] max-w-[300px] max-h-[280px] overflow-auto bg-card border border-border rounded-lg shadow-lg p-1">
+          <div className="absolute z-50 mt-1 left-0 right-0 max-h-[280px] overflow-auto bg-card border border-border rounded-lg shadow-lg p-1">
             {(values.tagIds ?? []).length > 0 && (
               <button
                 type="button"
