@@ -57,6 +57,7 @@ log "B: drizzle-kit push from schema.ts"
 normalize() {
   sed -E '/^CREATE TABLE public\.(schema_migrations|data_migrations) \($/,/^\);$/d' "$1" \
     | grep -v '^--' \
+    | grep -v -E '^\\(un)?restrict ' \
     | grep -v -E '^(CREATE EXTENSION|COMMENT ON EXTENSION)' \
     | grep -v -E 'search_vector|idx_items_search|schema_migrations|data_migrations' \
     | sed 's/,\s*$//' \
